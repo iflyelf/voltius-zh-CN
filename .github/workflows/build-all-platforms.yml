@@ -171,7 +171,18 @@ jobs:
       - name: 重命名产物 (添加 zh-CN 标识)
         shell: bash
         run: |
-          cd voltius/src-tauri/target/${{ matrix.target }}/release/bundle
+          # 动态检测构建产物路径(原生构建无 target triple)
+          if [ -d "voltius/target/${{ matrix.target }}/release/bundle" ]; then
+            BUNDLE_DIR="voltius/target/${{ matrix.target }}/release/bundle"
+          elif [ -d "voltius/target/release/bundle" ]; then
+            BUNDLE_DIR="voltius/target/release/bundle"
+          else
+            echo "❌ 找不到构建产物目录"
+            exit 1
+          fi
+          echo "📦 产物目录: $BUNDLE_DIR"
+          echo "BUNDLE_DIR=$BUNDLE_DIR" >> "$GITHUB_ENV"
+          cd "$BUNDLE_DIR"
           
           # 根据平台重命名
           case "${{ matrix.platform }}" in
@@ -240,9 +251,9 @@ jobs:
         with:
           name: Voltius-${{ matrix.os_label }}-zh-CN
           path: |
-            voltius/src-tauri/target/${{ matrix.target }}/release/bundle/deb/*_zh-CN.deb
-            voltius/src-tauri/target/${{ matrix.target }}/release/bundle/rpm/*_zh-CN.rpm
-            voltius/src-tauri/target/${{ matrix.target }}/release/bundle/appimage/*_zh-CN.AppImage
+            ${{ env.BUNDLE_DIR }}/deb/*_zh-CN.deb
+            ${{ env.BUNDLE_DIR }}/rpm/*_zh-CN.rpm
+            ${{ env.BUNDLE_DIR }}/appimage/*_zh-CN.AppImage
           if-no-files-found: warn
       
       - name: 上传 Windows 安装包
@@ -251,8 +262,8 @@ jobs:
         with:
           name: Voltius-${{ matrix.os_label }}-zh-CN
           path: |
-            voltius/src-tauri/target/${{ matrix.target }}/release/bundle/msi/*_zh-CN.msi
-            voltius/src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*_zh-CN-setup.exe
+            ${{ env.BUNDLE_DIR }}/msi/*_zh-CN.msi
+            ${{ env.BUNDLE_DIR }}/nsis/*_zh-CN-setup.exe
           if-no-files-found: warn
       
       - name: 上传 macOS 安装包
@@ -261,8 +272,8 @@ jobs:
         with:
           name: Voltius-${{ matrix.os_label }}-zh-CN
           path: |
-            voltius/src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*_zh-CN.dmg
-            voltius/src-tauri/target/${{ matrix.target }}/release/bundle/macos/*_zh-CN.app.tar.gz
+            ${{ env.BUNDLE_DIR }}/dmg/*_zh-CN.dmg
+            ${{ env.BUNDLE_DIR }}/macos/*_zh-CN.app.tar.gz
           if-no-files-found: warn
 
   # 第三步: Android 构建
