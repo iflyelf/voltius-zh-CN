@@ -247,6 +247,90 @@ git push origin zh-v0.9.2-1
 
 如需正式签名：Windows 需购买代码签名证书（.pfx）；macOS 需 Apple Developer 账号（99 USD/年）+ 公证；Android 需替换调试密钥为正式密钥。将证书 Base64 编码后配置到 GitHub Secrets，并在 workflow 中添加签名步骤。
 
+### Tauri 更新签名密钥（必需）
+
+上游 Voltius 的 `tauri.conf.json` 启用了 updater 插件并内置了公钥，构建时 Tauri 要求提供对应的私钥来签名更新包，否则构建会报错：
+
+```
+Error: A public key has been found, but no private key. Make sure to set `TAURI_SIGNING_PRIVATE_KEY` environment variable.
+```
+
+因此汉化版需生成自己的签名密钥对，`localize.py` 会在打补丁时用汉化版公钥替换上游 pubkey（见 `patch_tauri_pubkey`）。
+
+#### 步骤 1：生成密钥对
+
+```bash
+# 生成一个强密码并保存
+SIGN_PW=$(openssl rand -base64 18)
+echo "$SIGN_PW"   # 请妥善保存此密码
+
+# 生成 Tauri 签名密钥对（minisign 格式）
+npx --yes @tauri-apps/cli@latest signer generate \
+  -w voltius_zh.key -p "$SIGN_PW"
+
+# 产出:
+#   voltius_zh.key      私钥（绝密，丢失将无法签名更新）
+#   voltius_zh.key.pub  公钥（可公开，用于验证更新包）
+```
+
+将公钥内容填入 `localize.py` 的 `patch_tauri_pubkey()` 中的 `NEW_PUBKEY` 变量。
+
+#### 步骤 2：通过 API 配置 GitHub Secrets
+
+GitHub Secrets 需用仓库公钥进行 NaCl 加密后上传（非明文），需安装 `PyNaCl`（`pip install pynacl`）：
+
+```bash
+export GITHUB_TOKEN="你的_GitHub_Token"
+export GH_REPO="你的用户名/voltius-zh-CN"
+
+# 获取仓库公钥
+curl -s -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+  -H "Accept: application/vnd.github+json" \
+  "https://api.github.com/repos/${GH_REPO}/actions/secrets/public-key" \
+  > /tmp/repo_pubkey.json
+
+# 加密并上传两个 Secret
+python3 - <<'PYEOF'
+import json, base64, os, urllib.request
+from nacl import public, encoding
+
+TOKEN = os.environ["GITHUB_TOKEN"]
+REPO = os.environ["GH_REPO"]
+pk = json.load(open("/tmp/repo_pubkey.json"))
+key_id = pk["key_id"]
+box = public.SealedBox(public.PublicKey(pk["key"].encode(), encoding.Base64Encoder()))
+
+def put_secret(name, value):
+    payload = json.dumps({
+        "encrypted_value": base64.b64encode(box.encrypt(value.encode())).decode(),
+        "key_id": key_id,
+    }).encode()
+    req = urllib.request.Request(
+        f"https://api.github.com/repos/{REPO}/actions/secrets/{name}",
+        data=payload, method="PUT",
+        headers={"Authorization": f"Bearer {TOKEN}",
+                 "Accept": "application/vnd.github+json"})
+    urllib.request.urlopen(req)
+    print(f"✅ {name} 已配置")
+
+put_secret("TAURI_SIGNING_PRIVATE_KEY", open("voltius_zh.key").read().strip())
+put_secret("TAURI_SIGNING_PRIVATE_KEY_PASSWORD", os.environ.get("SIGN_PW", ""))
+PYEOF
+
+unset GITHUB_TOKEN
+```
+
+也可在网页手动配置：仓库 **Settings → Secrets and variables → Actions → New repository secret**，分别添加：
+
+| Secret 名称 | 内容 |
+|-------------|------|
+| `TAURI_SIGNING_PRIVATE_KEY` | `voltius_zh.key` 私钥文件的完整内容 |
+| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | 步骤 1 生成的密码 |
+
+workflow 的构建步骤已通过 `env` 注入这两个变量，配置后即可正常构建签名的更新包。
+
+> ⚠️ 私钥和密码务必备份到密码管理器。丢失后无法为已发布版本签名新的更新，用户将无法自动更新。
+
 ---
 
 ## 本地构建
