@@ -367,6 +367,36 @@ def patch_unlock_vaults(repo):
     log.info("  ✅ 已解除保管库数量限制 (可创建无限制保管库)")
 
 
+def patch_force_pro(repo):
+    """强制客户端订阅状态为 Pro (配合自建服务器使用)。"""
+    path = Path(repo) / "src" / "stores" / "subscriptionStore.ts"
+    if not path.exists():
+        log.warning("  ⚠️ 未找到 subscriptionStore.ts，跳过 Pro 解锁")
+        return
+
+    src = path.read_text(encoding="utf-8")
+
+    if "汉化版: 强制 Pro 订阅" in src:
+        log.info("  ⏭️ Pro 状态已解锁，跳过")
+        return
+
+    # 将 tier 派生改为强制 "pro",这样 isPro/isTeams/isBusiness 全部为真
+    pattern = re.compile(
+        r'const tier = \(payload\.tier as Tier\) \?\? "free";'
+    )
+    new_src, n = pattern.subn(
+        'const tier = "pro" as Tier; // 汉化版: 强制 Pro 订阅 (配合自建服务器)',
+        src,
+    )
+
+    if n == 0:
+        log.warning("  ⚠️ 未匹配到 tier 派生代码(上游可能已变更),跳过")
+        return
+
+    path.write_text(new_src, encoding="utf-8")
+    log.info("  ✅ 已强制客户端订阅状态为 Pro")
+
+
 def do_patch(repo):
     log.info("🛠️ 应用源码补丁到 %s", repo)
     copy_locales_to_repo(repo)
@@ -374,6 +404,7 @@ def do_patch(repo):
     patch_locale_store(repo)
     patch_tauri_pubkey(repo)
     patch_unlock_vaults(repo)
+    patch_force_pro(repo)
     log.info("✅ 补丁应用完成")
 
 
