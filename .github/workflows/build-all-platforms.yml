@@ -442,21 +442,24 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION="${{ needs.prepare-localized-source.outputs.version }}"
-          TAG="zh-v${VERSION}"
           
-          # 创建 tag(如果不存在)
-          if ! git ls-remote --tags origin | grep -q "refs/tags/$TAG"; then
-            git tag "$TAG"
-            git push origin "$TAG" || true
+          # 确定 Release 的 tag:
+          #   - tag 触发: 直接用触发的 tag (如 zh-v0.9.2-1)
+          #   - 手动触发: 用 zh-v<版本>-<运行号> 生成唯一 tag
+          if [[ "${{ github.ref }}" == refs/tags/zh-v* ]]; then
+            TAG="${{ github.ref_name }}"
+          else
+            TAG="zh-v${VERSION}-${{ github.run_number }}"
           fi
+          echo "📦 发布 Release: $TAG"
           
-          # 创建 Release
+          # 创建 Release 并上传所有产物 (--clobber 允许覆盖同名 tag 的已有 release)
           gh release create "$TAG" \
             --repo "${{ github.repository }}" \
-            --title "Voltius ${VERSION} 简体中文版" \
+            --title "Voltius ${VERSION} 简体中文版 ($TAG)" \
             --notes-file release-notes.md \
-            --draft \
-            artifacts/**/*_zh-CN.*
+            artifacts/**/*_zh-CN.* \
+          || gh release upload "$TAG" artifacts/**/*_zh-CN.* --repo "${{ github.repository }}" --clobber
   
   # ============================================================
   # 清理旧的 workflow 记录
