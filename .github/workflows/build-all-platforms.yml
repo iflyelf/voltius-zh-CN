@@ -25,7 +25,7 @@ permissions:
 jobs:
   # 第一步: 准备汉化源码
   prepare-localized-source:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       version: ${{ steps.extract.outputs.version }}
     steps:
@@ -290,7 +290,7 @@ jobs:
     needs: prepare-localized-source
     permissions:
       contents: write
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: 下载汉化源码
         uses: actions/download-artifact@v8
@@ -377,7 +377,7 @@ jobs:
   # 第四步: 生成 Release
   create-release:
     needs: [prepare-localized-source, build-platforms, build-android]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/zh-v')
@@ -464,7 +464,7 @@ jobs:
   cleanup:
     name: 清理旧 workflow
     needs: [create-release]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     if: always()
     permissions:
       actions: write
