@@ -1,0 +1,450 @@
+name: 构建全平台汉化版
+
+on:
+  workflow_dispatch:
+    inputs:
+      upstream_tag:
+        description: 'Voltius 上游版本 (如 v0.9.2)'
+        required: true
+        type: string
+        default: 'v0.9.2'
+      
+  push:
+    tags:
+      - 'zh-v*'
+    branches:
+      - main
+    paths:
+      - 'locales/zh-CN/**'
+      - 'localize.py'
+      - '.github/workflows/build-all-platforms.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  # 第一步: 准备汉化源码
+  prepare-localized-source:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.extract.outputs.version }}
+    steps:
+      - name: Checkout 汉化项目
+        uses: actions/checkout@v4
+        with:
+          path: localize-tool
+      
+      - name: 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: 克隆并汉化 Voltius
+        working-directory: localize-tool
+        run: |
+          # 使用指定版本或默认 main 分支
+          TAG="${{ github.event.inputs.upstream_tag || 'main' }}"
+          if [[ "$TAG" == "main" ]]; then
+            python3 localize.py --repo voltius --translate --patch
+          else
+            git clone --depth 1 --branch "$TAG" https://github.com/VoltiusApp/voltius.git voltius
+            python3 localize.py --translate --patch
+          fi
+      
+      - name: 提取版本号
+        id: extract
+        working-directory: localize-tool/voltius
+        run: |
+          VERSION=$(jq -r '.version' src-tauri/tauri.conf.json)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "✅ 汉化版本: $VERSION"
+      
+      - name: 上传汉化后的源码
+        uses: actions/upload-artifact@v4
+        with:
+          name: voltius-localized-source
+          path: localize-tool/voltius/
+          retention-days: 1
+
+  # 第二步: 多平台构建
+  build-platforms:
+    needs: prepare-localized-source
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux x64
+          - platform: 'ubuntu-24.04'
+            target: 'x86_64-unknown-linux-gnu'
+            args: ''
+            os_label: 'Linux-x64'
+          
+          # Linux ARM64
+          - platform: 'ubuntu-24.04-arm'
+            target: 'aarch64-unknown-linux-gnu'
+            args: ''
+            os_label: 'Linux-arm64'
+          
+          # Windows x64
+          - platform: 'windows-latest'
+            target: 'x86_64-pc-windows-msvc'
+            args: ''
+            os_label: 'Windows-x64'
+          
+          # Windows ARM64
+          - platform: 'windows-latest'
+            target: 'aarch64-pc-windows-msvc'
+            args: '--target aarch64-pc-windows-msvc'
+            os_label: 'Windows-arm64'
+          
+          # macOS x64 (Intel)
+          - platform: 'macos-latest'
+            target: 'x86_64-apple-darwin'
+            args: '--target x86_64-apple-darwin'
+            os_label: 'macOS-Intel'
+          
+          # macOS ARM64 (Apple Silicon)
+          - platform: 'macos-latest'
+            target: 'aarch64-apple-darwin'
+            args: '--target aarch64-apple-darwin'
+            os_label: 'macOS-M1'
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: 下载汉化源码
+        uses: actions/download-artifact@v4
+        with:
+          name: voltius-localized-source
+          path: voltius
+      
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'pnpm'
+          cache-dependency-path: voltius/pnpm-lock.yaml
+      
+      - name: 安装 Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+          workspaces: 'voltius/src-tauri -> target'
+      
+      - name: 安装系统依赖 (Ubuntu)
+        if: matrix.platform == 'ubuntu-24.04' || matrix.platform == 'ubuntu-24.04-arm'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libsecret-1-dev \
+            xdg-utils
+      
+      - name: 安装前端依赖
+        working-directory: voltius
+        run: pnpm install --frozen-lockfile
+      
+      - name: 构建 Tauri 应用
+        working-directory: voltius
+        run: pnpm tauri build ${{ matrix.args }}
+      
+      - name: 重命名产物 (添加 zh-CN 标识)
+        shell: bash
+        run: |
+          cd voltius/src-tauri/target/${{ matrix.target }}/release/bundle
+          
+          # 根据平台重命名
+          case "${{ matrix.platform }}" in
+            ubuntu*)
+              # Linux: .deb, .rpm, .AppImage
+              for ext in deb rpm AppImage; do
+                if compgen -G "*.$ext" > /dev/null; then
+                  for file in *.$ext; do
+                    newname="${file%.$ext}_zh-CN.$ext"
+                    mv "$file" "$newname"
+                    echo "✅ 重命名: $file -> $newname"
+                  done
+                fi
+              done
+              ;;
+            windows*)
+              # Windows: .msi, .exe
+              if [ -d "msi" ]; then
+                cd msi
+                for file in *.msi; do
+                  [ -f "$file" ] || continue
+                  newname="${file%.msi}_zh-CN.msi"
+                  mv "$file" "$newname"
+                  echo "✅ 重命名: $file -> $newname"
+                done
+                cd ..
+              fi
+              if [ -d "nsis" ]; then
+                cd nsis
+                for file in *-setup.exe; do
+                  [ -f "$file" ] || continue
+                  newname="${file%-setup.exe}_zh-CN-setup.exe"
+                  mv "$file" "$newname"
+                  echo "✅ 重命名: $file -> $newname"
+                done
+                cd ..
+              fi
+              ;;
+            macos*)
+              # macOS: .dmg, .app.tar.gz
+              if [ -d "dmg" ]; then
+                cd dmg
+                for file in *.dmg; do
+                  [ -f "$file" ] || continue
+                  newname="${file%.dmg}_zh-CN.dmg"
+                  mv "$file" "$newname"
+                  echo "✅ 重命名: $file -> $newname"
+                done
+                cd ..
+              fi
+              if [ -d "macos" ]; then
+                cd macos
+                for file in *.app.tar.gz; do
+                  [ -f "$file" ] || continue
+                  newname="${file%.app.tar.gz}_zh-CN.app.tar.gz"
+                  mv "$file" "$newname"
+                  echo "✅ 重命名: $file -> $newname"
+                done
+              fi
+              ;;
+          esac
+      
+      - name: 上传 Linux 安装包
+        if: matrix.platform == 'ubuntu-24.04' || matrix.platform == 'ubuntu-24.04-arm'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Voltius-${{ matrix.os_label }}-zh-CN
+          path: |
+            voltius/src-tauri/target/${{ matrix.target }}/release/bundle/deb/*_zh-CN.deb
+            voltius/src-tauri/target/${{ matrix.target }}/release/bundle/rpm/*_zh-CN.rpm
+            voltius/src-tauri/target/${{ matrix.target }}/release/bundle/appimage/*_zh-CN.AppImage
+          if-no-files-found: warn
+      
+      - name: 上传 Windows 安装包
+        if: matrix.platform == 'windows-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Voltius-${{ matrix.os_label }}-zh-CN
+          path: |
+            voltius/src-tauri/target/${{ matrix.target }}/release/bundle/msi/*_zh-CN.msi
+            voltius/src-tauri/target/${{ matrix.target }}/release/bundle/nsis/*_zh-CN-setup.exe
+          if-no-files-found: warn
+      
+      - name: 上传 macOS 安装包
+        if: matrix.platform == 'macos-latest'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Voltius-${{ matrix.os_label }}-zh-CN
+          path: |
+            voltius/src-tauri/target/${{ matrix.target }}/release/bundle/dmg/*_zh-CN.dmg
+            voltius/src-tauri/target/${{ matrix.target }}/release/bundle/macos/*_zh-CN.app.tar.gz
+          if-no-files-found: warn
+
+  # 第三步: Android 构建
+  build-android:
+    needs: prepare-localized-source
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: 下载汉化源码
+        uses: actions/download-artifact@v4
+        with:
+          name: voltius-localized-source
+          path: voltius
+      
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'pnpm'
+          cache-dependency-path: voltius/pnpm-lock.yaml
+      
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+      
+      - name: Install Android NDK
+        run: |
+          sdkmanager "ndk;26.1.10909125"
+          echo "NDK_HOME=$ANDROID_SDK_ROOT/ndk/26.1.10909125" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_ROOT=$ANDROID_SDK_ROOT/ndk/26.1.10909125" >> "$GITHUB_ENV"
+      
+      - name: 安装 Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+      
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          key: aarch64-linux-android
+          workspaces: 'voltius/src-tauri -> target'
+      
+      - name: 安装前端依赖
+        working-directory: voltius
+        run: pnpm install --frozen-lockfile
+      
+      - name: 生成调试密钥库 (仅用于签名,非官方发布)
+        run: |
+          keytool -genkey -v \
+            -keystore $RUNNER_TEMP/voltius-zh.keystore \
+            -alias voltius \
+            -keyalg RSA -keysize 2048 -validity 10000 \
+            -storepass voltius123 -keypass voltius123 \
+            -dname "CN=Voltius ZH-CN Community, OU=Localization, O=Community, L=Shanghai, ST=Shanghai, C=CN"
+          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/voltius-zh.keystore" >> "$GITHUB_ENV"
+      
+      - name: 构建 Android APK
+        working-directory: voltius
+        env:
+          ANDROID_KEYSTORE_PASSWORD: voltius123
+          ANDROID_KEY_ALIAS: voltius
+          ANDROID_KEY_PASSWORD: voltius123
+        run: pnpm tauri android build --apk --target aarch64
+      
+      - name: 重命名 APK
+        run: |
+          VERSION=${{ needs.prepare-localized-source.outputs.version }}
+          src="voltius/src-tauri/gen/android/app/build/outputs/apk/universal/release/app-universal-release.apk"
+          dest="Voltius_${VERSION}_aarch64_zh-CN.apk"
+          mv "$src" "$dest"
+          echo "✅ APK: $dest"
+      
+      - name: 上传 Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Voltius-Android-zh-CN
+          path: Voltius_*_zh-CN.apk
+
+  # 第四步: 生成 Release
+  create-release:
+    needs: [prepare-localized-source, build-platforms, build-android]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/zh-v')
+    steps:
+      - name: 下载所有产物
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      
+      - name: 生成发布说明
+        run: |
+          VERSION="${{ needs.prepare-localized-source.outputs.version }}"
+          UPSTREAM_TAG="${{ github.event.inputs.upstream_tag || 'latest' }}"
+          
+          cat > release-notes.md <<EOF
+          # Voltius ${VERSION} 简体中文版
+          
+          基于 [Voltius ${UPSTREAM_TAG}](https://github.com/VoltiusApp/voltius/releases/tag/${UPSTREAM_TAG}) 官方版本构建
+          
+          ## 📦 安装说明
+          
+          ### Windows
+          - **x64 (Intel/AMD)**: 下载 \`*Windows-x64*_zh-CN.msi\`
+          - **ARM64 (骁龙)**: 下载 \`*Windows-arm64*_zh-CN.msi\`
+          - 运行安装后，打开 Voltius → Settings → Language → 选择 **简体中文**
+          
+          ### macOS
+          - **Intel Mac**: 下载 \`*macOS-Intel*_zh-CN.dmg\`
+          - **Apple Silicon (M1/M2/M3)**: 下载 \`*macOS-M1*_zh-CN.dmg\`
+          - 拖入 Applications 文件夹，首次运行右键 → 打开
+          
+          ### Linux
+          - **Ubuntu/Debian**: 下载 \`*.deb\`，运行 \`sudo dpkg -i <文件名>\`
+          - **Fedora/RHEL**: 下载 \`*.rpm\`，运行 \`sudo dnf install <文件名>\`
+          - **AppImage**: 下载 \`.AppImage\`，添加执行权限后直接运行
+          
+          ### Android
+          - 下载 \`Voltius_*_aarch64_zh-CN.apk\`
+          - 启用"未知来源"后安装(侧载方式，非 Play Store)
+          
+          ## 🌍 翻译状态
+          - ✅ 核心 UI: 已完成
+          - ⚠️ 设置页面: 进行中
+          - ⚠️ 帮助文档: 待翻译
+          
+          ## ⚠️ 注意事项
+          1. **覆盖安装**: 可直接覆盖官方版，数据不丢失
+          2. **签名问题**: 非官方签名，部分系统会有安全警告(安全,可信任)
+          3. **Android 密钥**: 使用社区调试密钥签名，首次安装需卸载官方版
+          
+          ## 🙏 致谢
+          - [Voltius](https://github.com/VoltiusApp/voltius) 官方团队
+          - 所有翻译贡献者
+          
+          ---
+          构建时间: $(date -u +"%Y-%m-%d %H:%M:%S UTC")  
+          构建来源: ${{ github.repository }}
+          EOF
+      
+      - name: 创建 GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ needs.prepare-localized-source.outputs.version }}"
+          TAG="zh-v${VERSION}"
+          
+          # 创建 tag(如果不存在)
+          if ! git ls-remote --tags origin | grep -q "refs/tags/$TAG"; then
+            git tag "$TAG"
+            git push origin "$TAG" || true
+          fi
+          
+          # 创建 Release
+          gh release create "$TAG" \
+            --repo "${{ github.repository }}" \
+            --title "Voltius ${VERSION} 简体中文版" \
+            --notes-file release-notes.md \
+            --draft \
+            artifacts/**/*_zh-CN.*
+  
+  # ============================================================
+  # 清理旧的 workflow 记录
+  # ============================================================
+  cleanup:
+    name: 清理旧 workflow
+    needs: [create-release]
+    runs-on: ubuntu-latest
+    if: always()
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: 删除旧的 workflow 运行记录
+        uses: Mattraks/delete-workflow-runs@main
+        with:
+          repository: ${{ github.repository }}
+          retain_days: 1
+          keep_minimum_runs: 0

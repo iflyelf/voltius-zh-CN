@@ -1,0 +1,37 @@
+=== 开始全量翻译，共 1933 条待翻译 ===
+[ 1/23] OK changelog.json - 已完成
+[ 2/23] OK common.json - 已完成
+[ 3/23] connections.json - 25 条
+    进度 25/1933 (1.3%)
+    saved connections.json
+[ 4/23] OK fileTransfer.json - 已完成
+[ 5/23] OK folders.json - 已完成
+[ 6/23] OK home.json - 已完成
+[ 7/23] OK hosts.json - 已完成
+[ 8/23] importExport.json - 91 条
+    进度 50/1933 (2.6%)
+    进度 75/1933 (3.9%)
+=== 开始全量翻译，共 1883 条待翻译 ===
+[ 1/23] OK changelog.json - 已完成
+[ 2/23] OK common.json - 已完成
+[ 3/23] connections.json - 25 条
+    进度 25/1883 (1.3%)
+    saved connections.json
+[ 4/23] OK fileTransfer.json - 已完成
+[ 5/23] OK folders.json - 已完成
+[ 6/23] OK home.json - 已完成
+[ 7/23] OK hosts.json - 已完成
+[ 8/23] importExport.json - 41 条
+    进度 50/1883 (2.7%)
+    saved importExport.json
+[ 9/23] keychain.json - 98 条
+    进度 75/1883 (4.0%)
+    进度 100/1883 (5.3%)
+    进度 125/1883 (6.6%)
+    进度 150/1883 (8.0%)
+    saved keychain.json
+[10/23] OK knownHosts.json - 已完成
+[11/23] layout.json - 161 条
+    进度 175/1883 (9.3%)
+    进度 200/1883 (10.6%)
+    进度 225/1883 (11.9%)

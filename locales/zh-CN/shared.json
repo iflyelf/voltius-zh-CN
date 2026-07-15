@@ -1,0 +1,107 @@
+{
+  "shared": {
+    "errorBanner": {
+      "dismiss": "关闭"
+    },
+    "trialExpiredModal": {
+      "title": "您的 Pro 试用已结束",
+      "body": "您已有 14 天时间试用 Pro，希望它对您有所帮助。升级即可继续使用实时同步和云功能。",
+      "upgradeButton": "升级到 Pro",
+      "laterButton": "稍后再说"
+    },
+    "createVaultModal": {
+      "title": "新建保管库",
+      "subtitle": "保管库帮助您有序管理凭据",
+      "nameLabel": "保管库名称",
+      "namePlaceholder": "例如：工作、个人、预发布…",
+      "createButton": "创建保管库"
+    },
+    "vaultCascadeModal": {
+      "headingMove": "将关联项移动到",
+      "headingCopy": "将关联项复制到",
+      "fallbackDescriptionMoved": "以下关联项位于其他保管库中，将一并被移动：",
+      "fallbackDescriptionCopied": "以下关联项位于其他保管库中，将一并被复制：",
+      "confirmMove": "全部移动",
+      "confirmCopy": "全部复制",
+      "typeLabel": {
+        "identity": "身份",
+        "key": "SSH 密钥"
+      }
+    },
+    "formSelect": {
+      "title": "选择"
+    },
+    "folderSelector": {
+      "noFolder": "无文件夹",
+      "namePlaceholder": "文件夹名称",
+      "newFolder": "新建文件夹"
+    },
+    "tagSelector": {
+      "placeholder": "添加标签…",
+      "removeTag": "移除标签 {{tag}}"
+    },
+    "portInput": {
+      "placeholder": "/dev/ttyUSB0 或 COM3"
+    },
+    "avatarStack": {
+      "participantCount_one": "{{count}} 位参与者",
+      "participantCount_other": "{{count}} 位参与者"
+    },
+    "panel": {
+      "saveState": {
+        "dirty": "编辑中...",
+        "saving": "保存中...",
+        "saved": "已保存"
+      }
+    },
+    "vaultPicker": {
+      "memberBadge": "成员"
+    },
+    "pickers": {
+      "thisComputer": "本机"
+    },
+    "sessionPicker": {
+      "insertTitle": "插入到...",
+      "executeTitle": "在以下位置执行...",
+      "insertConfirm_one": "插入到 {{count}} 个目标",
+      "insertConfirm_other": "插入到 {{count}} 个目标",
+      "executeConfirm_one": "在 {{count}} 个目标中执行",
+      "executeConfirm_other": "在 {{count}} 个目标中执行",
+      "noActiveSessions": "无活动会话",
+      "activeSessionsHeader": "活动会话",
+      "openNewConnectionHeader": "打开新连接",
+      "localShellFallbackName": "本地 Shell",
+      "sshSessionSub": "SSH 会话",
+      "noRemoteHostsFound": "未找到远程主机",
+      "noHostsFound": "未找到主机"
+    },
+    "hostPicker": {
+      "selectHostTitle": "选择主机",
+      "newHostButton": "新建主机",
+      "filterPlaceholder": "筛选主机...",
+      "localMachineName": "本地机器",
+      "wslSub": "WSL",
+      "noHostsConfigured": "未配置主机",
+      "noHostsMatch": "无匹配主机"
+    },
+    "sort": {
+      "nameAsc": "A → Z",
+      "nameDesc": "Z → A",
+      "newest": "最新优先",
+      "oldest": "最早优先"
+    },
+    "tagFilter": {
+      "filterByTag": "按标签筛选",
+      "emptyTitle": "添加标签",
+      "emptyDescription": "标签可帮助您筛选主机。您可以在编辑主机时添加标签。",
+      "searchPlaceholder": "筛选标签...",
+      "clearSelection": "清除选择 ({{count}})",
+      "noTagsMatch": "没有与“{{search}}”匹配的标签",
+      "deleteTagTitle": "删除标签“{{tag}}”？",
+      "deleteTagBody_one": "这将从 {{count}} 台主机中移除该标签。主机本身不会被删除。",
+      "deleteTagBody_other": "这将从 {{count}} 台主机中移除该标签。主机本身不会被删除。",
+      "renameTagTitle": "重命名标签",
+      "deleteTagButtonTitle": "删除标签"
+    }
+  }
+}

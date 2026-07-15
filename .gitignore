@@ -1,0 +1,6 @@
+# voltius 项目排除项
+voltius
+*.pyc
+__pycache__/
+.DS_Store
+*.log

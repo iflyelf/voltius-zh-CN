@@ -1,0 +1,58 @@
+{
+  "omni": {
+    "searchPlaceholder": "搜索主机、密钥、身份和命令...",
+    "categoryBadges": {
+      "all": "全部",
+      "join": "join> 会话",
+      "snippets": "> 代码片段",
+      "marketplace": "m> 应用市场",
+      "settings": "@ 设置"
+    },
+    "sections": {
+      "quickConnect": "快速连接",
+      "activeConnections": "活动连接",
+      "teamSessions": "团队会话",
+      "recent": "最近",
+      "hosts": "主机",
+      "local": "本地",
+      "keychain": "密钥链",
+      "snippets": "代码片段",
+      "actions": "操作",
+      "quickSettings": "快速设置",
+      "settings": "设置",
+      "joinByInviteCode": "通过邀请码加入"
+    },
+    "settingsDescription": "设置",
+    "pluginSettingsDescription": "插件设置",
+    "editHost": "编辑主机",
+    "deleteHost": "删除主机",
+    "resume": "恢复",
+    "join": "加入",
+    "participantCount_one": "{{count}} 人",
+    "participantCount_other": "{{count}} 人",
+    "joinCodePrompt": {
+      "title": "通过邀请码加入...",
+      "subtitle": "在此粘贴邀请码以加入私有会话"
+    },
+    "joinCodeEntered": {
+      "title": "通过邀请码加入"
+    },
+    "quickConnect": {
+      "connectTo": "连接到 {{user}}@{{host}}",
+      "portSsh": "端口 {{port}} — SSH",
+      "serialConnection": "串行连接",
+      "configurePortAndBaud": "配置端口和波特率",
+      "localShellNamed": "本地 Shell ({{shell}})",
+      "localShell": "本地 Shell",
+      "openLocalTerminal": "打开本地终端"
+    },
+    "localShellDefault": "本地 Shell",
+    "emptyState": {
+      "noSnippets": "暂无代码片段",
+      "marketplaceComingSoon": "应用市场即将上线",
+      "noSessionsMatch": "没有与 \"{{query}}\" 匹配的会话",
+      "noActiveTeamSessions": "没有活动的团队会话",
+      "noResultsFor": "没有 \"{{query}}\" 的结果"
+    }
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "home": {
+    "greeting": {
+      "morning": "早上好",
+      "afternoon": "下午好",
+      "evening": "晚上好"
+    },
+    "search": {
+      "placeholder": "搜索主机、会话、片段..."
+    },
+    "stat": {
+      "vaults": "拱顶",
+      "hosts": "主机",
+      "activeSessions": "活跃会话",
+      "portForwards": "端口转发"
+    },
+    "quickActions": {
+      "export": "导出",
+      "import": "导入"
+    },
+    "recentHosts": {
+      "title": "最近的主持人",
+      "seeAll": "查看全部",
+      "prevPage": "上一页",
+      "nextPage": "下一页",
+      "pageNumber": "页{{number}}"
+    },
+    "allHosts": {
+      "back": "返回",
+      "title": "所有主机",
+      "empty": "还没有主机。"
+    },
+    "hostCard": {
+      "pin": "固定",
+      "unpin": "取消固定",
+      "baud": "{{rate}} 波特率"
+    },
+    "serialFallback": "串口",
+    "vaultCard": {
+      "hostCount_one": "{{count}}主机",
+      "hostCount_other": "{{count}} 主机",
+      "empty": "还没有主机",
+      "more": "+ {{count}} 更多"
+    }
+  }
+}
