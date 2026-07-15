@@ -302,11 +302,35 @@ def patch_locale_store(repo):
     log.info("  ✅ 已修改 src/stores/localeStore.ts")
 
 
+def patch_tauri_pubkey(repo):
+    """替换 tauri.conf.json 中的 updater pubkey 为汉化版签名公钥。"""
+    conf_path = Path(repo) / "src-tauri" / "tauri.conf.json"
+    if not conf_path.exists():
+        log.warning("  ⚠️ 未找到 tauri.conf.json，跳过 pubkey 替换")
+        return
+    
+    # 汉化版签名公钥 (对应 GitHub Secrets 中的私钥)
+    NEW_PUBKEY = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDIwNTlGMzdDRDc0QkE5OTAKUldTUXFVdlhmUE5aSUlIbk82T3RYQnVoQm5ITUw2cU8xQVkvZlFUaEFTbUt6NzFwaHNxbTBrclYK"
+    
+    conf = read_json(conf_path)
+    if "plugins" in conf and "updater" in conf["plugins"]:
+        old_key = conf["plugins"]["updater"].get("pubkey", "")
+        if old_key == NEW_PUBKEY:
+            log.info("  ⏭️ pubkey 已是汉化版密钥，跳过")
+            return
+        conf["plugins"]["updater"]["pubkey"] = NEW_PUBKEY
+        write_json(conf_path, conf)
+        log.info("  ✅ 已替换 tauri.conf.json 中的 updater pubkey")
+    else:
+        log.info("  ⏭️ tauri.conf.json 无 updater 配置，跳过")
+
+
 def do_patch(repo):
     log.info("🛠️ 应用源码补丁到 %s", repo)
     copy_locales_to_repo(repo)
     patch_i18n_index(repo)
     patch_locale_store(repo)
+    patch_tauri_pubkey(repo)
     log.info("✅ 补丁应用完成")
 
 

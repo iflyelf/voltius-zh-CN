@@ -160,6 +160,9 @@ jobs:
       
       - name: 构建 Tauri 应用
         working-directory: voltius
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: pnpm tauri build ${{ matrix.args }}
       
       - name: 重命名产物 (添加 zh-CN 标识)
@@ -330,6 +333,8 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: voltius123
           ANDROID_KEY_ALIAS: voltius
           ANDROID_KEY_PASSWORD: voltius123
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: pnpm tauri android build --apk --target aarch64
       
       - name: 重命名 APK
