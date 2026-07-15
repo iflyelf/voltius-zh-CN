@@ -257,6 +257,22 @@ Error: A public key has been found, but no private key. Make sure to set `TAURI_
 
 因此汉化版需生成自己的签名密钥对，`localize.py` 会在打补丁时用汉化版公钥替换上游 pubkey（见 `patch_tauri_pubkey`）。
 
+#### 快捷方式：一键脚本（推荐）
+
+项目提供 `setup-tauri-signing.sh` 自动完成全部配置：生成密钥对、上传 GitHub Secrets、更新 `localize.py` 公钥、备份密钥。
+
+```bash
+# 需要 GitHub Token（repo + workflow 权限）
+export GITHUB_TOKEN="ghp_xxxxxxxxxxxxx"
+
+# 依赖: npx (Node.js) / python3 + pynacl / jq / openssl
+pip install pynacl
+
+./setup-tauri-signing.sh
+```
+
+脚本会交互确认后执行，密钥备份到 `~/.voltius-zh-keys-backup-<时间戳>/`。若需手动操作，参考以下步骤。
+
 #### 步骤 1：生成密钥对
 
 ```bash
