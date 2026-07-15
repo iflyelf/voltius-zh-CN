@@ -4,10 +4,10 @@ on:
   workflow_dispatch:
     inputs:
       upstream_tag:
-        description: 'Voltius 上游版本 (如 v0.9.2)'
-        required: true
+        description: 'Voltius 上游版本 (如 v0.9.2，留空自动获取最新版)'
+        required: false
         type: string
-        default: 'v0.9.2'
+        default: ''
       
   push:
     tags:
@@ -18,6 +18,10 @@ on:
       - 'locales/zh-CN/**'
       - 'localize.py'
       - '.github/workflows/build-all-platforms.yml'
+  
+  schedule:
+    # 每周一 UTC 02:00 (北京时间 10:00) 自动检查上游更新
+    - cron: '0 2 * * 1'
 
 permissions:
   contents: write
@@ -43,18 +47,26 @@ jobs:
         working-directory: localize-tool
         run: |
           # 确定上游 Voltius 版本:
-          #   1. 手动触发: 使用 inputs.upstream_tag
+          #   1. 手动触发且指定版本: 使用 inputs.upstream_tag
           #   2. tag 触发 (zh-vX.Y.Z-N): 从 tag 名提取 vX.Y.Z
-          #   3. 其他 (push main): 使用 main 分支
+          #   3. 其他情况: 自动获取上游最新 release
           if [[ -n "${{ github.event.inputs.upstream_tag }}" ]]; then
             TAG="${{ github.event.inputs.upstream_tag }}"
+            echo "📌 使用手动指定版本: $TAG"
           elif [[ "${{ github.ref }}" == refs/tags/zh-v* ]]; then
             # zh-v0.9.2-1 -> v0.9.2
             TAG=$(echo "${{ github.ref_name }}" | sed -E 's/^zh-(v[0-9]+\.[0-9]+\.[0-9]+).*/\1/')
+            echo "📌 从 tag 提取版本: $TAG"
           else
-            TAG="main"
+            # 自动获取上游最新 release
+            TAG=$(curl -s "https://api.github.com/repos/VoltiusApp/voltius/releases/latest" | jq -r '.tag_name')
+            if [[ -z "$TAG" || "$TAG" == "null" ]]; then
+              echo "⚠️ 无法获取上游最新版本,使用 main 分支"
+              TAG="main"
+            else
+              echo "✨ 自动获取上游最新版本: $TAG"
+            fi
           fi
-          echo "📌 使用上游 Voltius 版本: $TAG"
 
           if [[ "$TAG" == "main" ]]; then
             python3 localize.py --repo voltius --translate --patch
