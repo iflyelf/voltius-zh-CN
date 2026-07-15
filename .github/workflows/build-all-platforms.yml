@@ -25,7 +25,7 @@ permissions:
 jobs:
   # 第一步: 准备汉化源码
   prepare-localized-source:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.extract.outputs.version }}
     steps:
@@ -88,7 +88,7 @@ jobs:
       matrix:
         include:
           # Linux x64
-          - platform: 'ubuntu-24.04'
+          - platform: 'ubuntu-latest'
             target: 'x86_64-unknown-linux-gnu'
             args: ''
             os_label: 'Linux-x64'
@@ -153,7 +153,7 @@ jobs:
           workspaces: 'voltius/src-tauri -> target'
       
       - name: 安装系统依赖 (Ubuntu)
-        if: matrix.platform == 'ubuntu-24.04' || matrix.platform == 'ubuntu-24.04-arm'
+        if: matrix.platform == 'ubuntu-latest' || matrix.platform == 'ubuntu-24.04-arm'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -255,7 +255,7 @@ jobs:
           esac
       
       - name: 上传 Linux 安装包
-        if: matrix.platform == 'ubuntu-24.04' || matrix.platform == 'ubuntu-24.04-arm'
+        if: matrix.platform == 'ubuntu-latest' || matrix.platform == 'ubuntu-24.04-arm'
         uses: actions/upload-artifact@v7
         with:
           name: Voltius-${{ matrix.os_label }}-zh-CN
@@ -290,7 +290,7 @@ jobs:
     needs: prepare-localized-source
     permissions:
       contents: write
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     steps:
       - name: 下载汉化源码
         uses: actions/download-artifact@v8
@@ -377,7 +377,7 @@ jobs:
   # 第四步: 生成 Release
   create-release:
     needs: [prepare-localized-source, build-platforms, build-android]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     permissions:
       contents: write
     if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/zh-v')
@@ -464,7 +464,7 @@ jobs:
   cleanup:
     name: 清理旧 workflow
     needs: [create-release]
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-latest
     if: always()
     permissions:
       actions: write
