@@ -325,12 +325,55 @@ def patch_tauri_pubkey(repo):
         log.info("  ⏭️ tauri.conf.json 无 updater 配置，跳过")
 
 
+def patch_unlock_vaults(repo):
+    """解除免费版单一保管库限制,允许创建无限制保管库。"""
+    path = Path(repo) / "src" / "components" / "layout" / "VaultSidebar.tsx"
+    if not path.exists():
+        log.warning("  ⚠️ 未找到 VaultSidebar.tsx，跳过保管库解锁")
+        return
+
+    src = path.read_text(encoding="utf-8")
+
+    # 已解锁则跳过
+    if "解除免费版单一保管库限制" in src:
+        log.info("  ⏭️ 保管库限制已解除，跳过")
+        return
+
+    # 1. 移除限制检查: if (!isPro && vaults.length >= 1) { ... return; }
+    pattern = re.compile(
+        r'if \(!isPro && vaults\.length >= 1\) \{\s*'
+        r'setShowVaultLimitModal\(true\);\s*'
+        r'return;\s*'
+        r'\}',
+        re.MULTILINE,
+    )
+    new_src, n = pattern.subn(
+        "// 汉化版: 解除免费版单一保管库限制,允许创建无限制保管库", src
+    )
+
+    if n == 0:
+        log.warning("  ⚠️ 未匹配到保管库限制代码(上游可能已变更),跳过")
+        return
+
+    # 2. 移除未使用的 isPro 变量声明
+    new_src = re.sub(
+        r'^\s*const isPro = useSubscriptionStore\(\(s\) => s\.isPro\);\s*$',
+        '',
+        new_src,
+        flags=re.MULTILINE
+    )
+
+    path.write_text(new_src, encoding="utf-8")
+    log.info("  ✅ 已解除保管库数量限制 (可创建无限制保管库)")
+
+
 def do_patch(repo):
     log.info("🛠️ 应用源码补丁到 %s", repo)
     copy_locales_to_repo(repo)
     patch_i18n_index(repo)
     patch_locale_store(repo)
     patch_tauri_pubkey(repo)
+    patch_unlock_vaults(repo)
     log.info("✅ 补丁应用完成")
 
 
