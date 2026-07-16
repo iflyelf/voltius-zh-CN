@@ -25,7 +25,7 @@ FLEXOKI_LIGHT_THEME = '''  {
       bgElevated: "#E6E4D9",
       bgModal: "#F2F0E5",
       border: "#D0CEC4",
-      borderHover: "#D66E0D",
+      borderHover: "#DAD8CE",
       textDim: "#878580",
       textMuted: "#575653",
       textSecondary: "#403E3C",
