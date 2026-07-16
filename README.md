@@ -1,548 +1,438 @@
-# Voltius 中文汉化工具
+# Voltius 简体中文版
 
-为 [Voltius](https://github.com/VoltiusApp/voltius) 提供完整的简体中文语言支持。
+[Voltius](https://github.com/VoltiusApp/voltius) 的完整中文汉化版本，包含**客户端汉化 + 自建服务器 + Pro 功能解锁**。
 
-Voltius 是一个基于 Rust/Tauri 的现代化 SSH/SFTP 客户端，是 Termius 的开源替代品。本项目通过**源码级汉化**（标准 i18next 国际化框架）为其添加简体中文界面。
-
----
-
-## 目录
-
-- [重要说明](#重要说明)
-- [技术方案](#技术方案)
-- [目录结构](#目录结构)
-- [快速开始](#快速开始)
-- [使用 GitHub Actions 构建](#使用-github-actions-构建)
-- [本地构建](#本地构建)
-- [翻译贡献指南](#翻译贡献指南)
-- [术语表](#术语表)
-- [常见问题](#常见问题)
-- [许可证](#许可证)
-- [致谢](#致谢)
+Voltius 是一个基于 Rust/Tauri 的现代化 SSH/SFTP 客户端，是 Termius 的开源替代品（AGPLv3 协议）。
 
 ---
 
-## 重要说明
+## 🚀 快速开始
 
-**Q: 能否像 Termius 那样直接对已安装应用打补丁？**
+### 下载安装包
 
-**A: 不能。** 这是架构差异导致的：
+访问 [Releases](https://github.com/iflyelf/voltius-zh-CN/releases) 下载最新版本：
 
-| 对比项 | Termius | Voltius（本项目） |
-|--------|---------|-------------------|
-| 架构 | Electron（`app.asar` 打包，可解包修改） | Rust/Tauri（前端编译进二进制 `.exe`，无法解包） |
-| 汉化方式 | 二进制补丁（正则替换 asar 中的 JS） | 源码修改 → 重新构建 |
-| 国际化框架 | 硬编码字符串 | i18next（标准 i18n） |
-| 维护成本 | 每版本需重新提取字符串 | 语料文件独立，易于维护 |
-| 多平台支持 | 需分别处理 | 单一源码，构建产出全平台 |
-| 上游贡献 | 无法回馈上游 | 可向上游提交 PR |
+- **Windows**: `Voltius_x.x.x_x64-setup.exe` / `.msi`
+- **macOS**: `Voltius_x.x.x_universal.dmg` (支持 Intel + Apple Silicon)
+- **Linux**: `Voltius_x.x.x_amd64.AppImage` / `.deb`
+- **Android**: `Voltius_x.x.x.apk`
 
-**推荐方式：** 使用本工具构建汉化版安装包，用户下载后覆盖安装即可（数据不会丢失）。安装后在 **Settings → Language** 选择 **简体中文**。
+安装后，在 **设置 → Language** 选择 **简体中文**。
+
+### 功能特性
+
+✅ **完整汉化**：95.1% 覆盖率 (2526/2656 条)，基于标准 i18next 框架  
+✅ **无限保管库**：免费版解除单一保管库限制  
+✅ **自建服务器**：Go 语言实现，支持云同步 + Pro 功能  
+✅ **端到端加密**：Argon2id + XChaCha20，服务器无法解密数据  
+✅ **跨平台**：Windows/macOS/Linux/Android 全平台支持  
+✅ **自动更新**：Tauri 签名，支持应用内自动更新
 
 ---
 
-## 技术方案
+## 📦 自建服务器（可选）
 
-Voltius 已内置完善的 i18n 框架：
+本项目提供 Go 语言实现的自建服务器，实现云同步和 Pro 功能（多设备同步、团队保险库等）。
 
-- 前端使用 `i18next` + React
-- 所有文案已抽取至 `src/i18n/locales/en/*.json`（23 个文件）
-- 上游目前支持 `en`（英语）和 `fr`（法语）
+### 服务器特性
 
-汉化需要 3 处改动：
+- 🔐 **硬编码 Pro 订阅**：所有用户自动获得 Pro 权限
+- 📦 **静态二进制**：CGO_ENABLED=0 编译，6MB 单文件，无需依赖
+- 🔒 **端到端加密**：服务器只存储密文，无法解密用户数据
+- 🚀 **SSE 实时推送**：多设备实时同步
+- 💾 **SQLite 存储**：轻量级，单文件数据库
 
-**1. 新增中文语料** `src/i18n/locales/zh-CN/*.json`（23 个文件）
+### 快速部署
 
-**2. 注册中文资源** `src/i18n/index.ts`
+#### 1. 编译服务器
 
-```typescript
-const zhCN = assemble(
-  import.meta.glob("./locales/zh-CN/*.json", { eager: true }) as Record<...>
-);
-
-i18n.use(initReactI18next).init({
-  resources: {
-    en: { translation: en },
-    fr: { translation: fr },
-    "zh-CN": { translation: zhCN }  // 新增
-  },
-});
+```bash
+cd voltius-server
+chmod +x build.sh
+./build.sh
 ```
 
-**3. 添加语言选项** `src/stores/localeStore.ts`
+**产物**：
+- `dist/voltius-server-linux-amd64`
+- `dist/voltius-server-linux-arm64`
+- `dist/voltius-server-darwin-amd64` (macOS Intel)
+- `dist/voltius-server-darwin-arm64` (macOS M1/M2/M3)
+- `dist/voltius-server-windows-amd64.exe`
 
-```typescript
-export type Locale = "en" | "fr" | "zh-CN";  // 扩展类型
+#### 2. 运行服务器
 
-export const SUPPORTED_LOCALES: { value: Locale; label: string }[] = [
-  { value: "en", label: "English" },
-  { value: "fr", label: "Français" },
-  { value: "zh-CN", label: "简体中文" },  // 新增
-];
+```bash
+# 基础运行（自动生成 JWT 密钥）
+./dist/voltius-server-linux-amd64
+
+# 自定义配置
+./dist/voltius-server-linux-amd64 \
+  -port 8080 \
+  -db /data/voltius.db \
+  -jwt-secret "your-random-secret-CHANGE-ME"
 ```
 
-上述改动由 `localize.py --patch` 自动完成。
+**参数说明**：
+- `-port`：服务器端口（默认 8080）
+- `-db`：SQLite 数据库路径（默认 `./voltius.db`）
+- `-jwt-secret`：JWT 签名密钥（留空自动生成，**建议手动指定并保存**）
+
+#### 3. 生产部署（Systemd）
+
+```bash
+# 1. 安装二进制
+sudo cp dist/voltius-server-linux-amd64 /usr/local/bin/voltius-server
+sudo chmod +x /usr/local/bin/voltius-server
+
+# 2. 创建服务
+sudo tee /etc/systemd/system/voltius-server.service << 'EOF'
+[Unit]
+Description=Voltius Self-Hosted Server
+After=network.target
+
+[Service]
+Type=simple
+User=voltius
+WorkingDirectory=/var/lib/voltius
+ExecStart=/usr/local/bin/voltius-server -port 8080 -db /var/lib/voltius/voltius.db -jwt-secret YOUR_SECRET_HERE
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# 3. 创建用户和目录
+sudo useradd -r -s /bin/false voltius
+sudo mkdir -p /var/lib/voltius
+sudo chown voltius:voltius /var/lib/voltius
+
+# 4. 启动服务
+sudo systemctl daemon-reload
+sudo systemctl enable voltius-server
+sudo systemctl start voltius-server
+sudo systemctl status voltius-server
+```
+
+#### 4. Nginx 反向代理 + HTTPS
+
+```nginx
+# /etc/nginx/sites-available/voltius
+server {
+    listen 443 ssl http2;
+    server_name api.yourdomain.com;
+
+    ssl_certificate /path/to/fullchain.pem;
+    ssl_certificate_key /path/to/privkey.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # SSE 支持
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 86400s;
+    }
+}
+```
+
+```bash
+sudo ln -s /etc/nginx/sites-available/voltius /etc/nginx/sites-enabled/
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+#### 5. 客户端配置
+
+打开 Voltius 客户端 → 登录界面 → 点击 **"▸ Custom server URL"**：
+
+```
+http://your-server-ip:8080       # HTTP (测试)
+https://api.yourdomain.com       # HTTPS (生产环境推荐)
+```
+
+注册/登录后，自动获得 **Pro 权限**和**无限保管库**。
+
+### Docker 部署（可选）
+
+```dockerfile
+FROM scratch
+COPY voltius-server-linux-amd64 /voltius-server
+EXPOSE 8080
+CMD ["/voltius-server", "-port", "8080"]
+```
+
+```bash
+docker build -t voltius-server .
+docker run -d \
+  -p 8080:8080 \
+  -v /data:/data \
+  voltius-server \
+  -db /data/voltius.db \
+  -jwt-secret YOUR_SECRET
+```
+
+### 数据库备份
+
+```bash
+# SQLite 热备份
+sqlite3 /var/lib/voltius/voltius.db ".backup /backup/voltius-$(date +%Y%m%d).db"
+
+# 定时备份 (crontab)
+0 2 * * * sqlite3 /var/lib/voltius/voltius.db ".backup /backup/voltius-$(date +\%Y\%m\%d).db"
+```
+
+### 服务器 API 端点
+
+**认证**：
+- `POST /v1/auth/register` - 注册
+- `GET /v1/auth/challenge?email=xxx` - 获取 account_id
+- `POST /v1/auth/login` - 登录
+- `POST /v1/auth/refresh` - 刷新 token
+- `GET /v1/auth/me` - 当前用户信息
+- `PUT /v1/auth/public-key` - 更新公钥
+
+**同步**：
+- `GET /v1/sync/blob?device_id=xxx` - 下载加密数据
+- `PUT /v1/sync/blob?device_id=xxx` - 上传加密数据
+- `GET /v1/sync/devices` - 设备列表
+- `GET /v1/sync/stream?device_id=xxx` - SSE 实时推送
+
+**订阅**：
+- `GET /v1/billing/subscription` - 订阅状态（硬编码 Pro）
+
+### 安全说明
+
+#### 端到端加密
+所有用户数据经过客户端加密后上传：
+
+```
+用户密码 → Argon2id(128MB, t=3, p=4) → master_key (32字节)
+  ├─ HKDF-SHA256(info="auth") → auth_key (上传服务器验证)
+  └─ HKDF-SHA256(info="enc")  → enc_key  (本地加密数据)
+
+加密: XChaCha20-Poly1305(enc_key, plaintext) → ciphertext (base64)
+```
+
+- **服务器只存储密文**：即使数据库泄露也无法解密
+- **密钥从不上传**：master_key 和 enc_key 永远在本地
+- **auth_key 验证**：服务器存储 SHA256(auth_key)，恒定时间比较
+
+#### JWT Token 结构
+
+```json
+{
+  "sub": "account_id",
+  "email": "user@example.com",
+  "tier": "pro",           // 🔓 硬编码 Pro
+  "exp": 1720000000,
+  "iss": "voltius-selfhosted"
+}
+```
 
 ---
 
-## 目录结构
+## 🛠️ 开发相关
+
+### 技术栈
+
+**客户端**：
+- Tauri 2.0 + Rust (后端)
+- React + TypeScript (前端)
+- i18next (国际化框架)
+
+**服务器**：
+- Go 1.21+ (CGO_ENABLED=0 静态编译)
+- modernc.org/sqlite (纯 Go 的 SQLite)
+- golang-jwt/jwt (JWT 签发)
+
+### 目录结构
 
 ```
-voltius/
-├── localize.py              # 核心汉化脚本（克隆/翻译/打补丁/构建）
-├── batch-translate.py       # 批量机器翻译（带限流保护）
-├── quick-patch.sh           # 一键汉化脚本
-├── README.md                # 本文档
-├── .github/
-│   └── workflows/
-│       └── build-all-platforms.yml   # 全平台 CI 构建
-│
-├── locales/                 # 中文语料库（项目维护）
+voltius-zh-CN/
+├── locales/              # 中文语料文件（23 个 JSON）
 │   └── zh-CN/
-│       ├── _meta.json       # 元信息
-│       ├── common.json      # 通用 UI（保存/取消/删除等）
-│       ├── settings.json    # 设置页面（最大文件，567 条）
-│       ├── layout.json      # 主界面/导航
-│       ├── hosts.json       # 主机管理
-│       ├── terminal.json    # 终端功能
-│       └── ...              # 共 23 个文件
-│
-├── translations/            # 翻译辅助
-│   ├── glossary.json        # 术语表（人工维护）
-│   └── machine.json         # 机翻缓存（支持断点续传）
-│
-└── voltius/                 # 克隆的上游仓库（.gitignore，patch 注入到此）
-    └── src/i18n/locales/zh-CN/
+│       ├── common.json
+│       ├── layout.json
+│       └── ...
+├── localize.py           # 汉化脚本（应用补丁/构建/检查）
+├── voltius-server/       # Go 自建服务器
+│   ├── main.go
+│   ├── jwt.go           # 硬编码 tier="pro"
+│   ├── auth.go
+│   ├── sync.go
+│   └── build.sh         # 跨平台编译
+├── .github/workflows/
+│   └── build-all-platforms.yml  # CI 构建配置
+└── README.md            # 本文档
 ```
 
----
+### 本地构建
 
-## 快速开始
+#### 前置要求
 
-### 使用场景
+- **Node.js** 24+ (推荐使用 nvm)
+- **pnpm** 9+ (`npm install -g pnpm`)
+- **Rust** (通过 [rustup](https://rustup.rs/) 安装)
+- **Python 3** (用于 localize.py)
+- **平台构建工具**：
+  - Linux: `build-essential` / `libwebkit2gtk-4.1-dev` / `libssl-dev`
+  - macOS: Xcode Command Line Tools
+  - Windows: Visual Studio 2022 (C++ 工具)
 
-| 你是... | 推荐方式 |
-|---------|---------|
-| **普通用户**（想要中文版 Voltius） | 在 [Releases](../../releases) 下载构建好的安装包，或在 [Issues](../../issues) 发起构建请求 |
-| **有 GitHub 账号**（想自动构建） | 参考 [使用 GitHub Actions 构建](#使用-github-actions-构建) |
-| **开发者**（想贡献翻译） | 参考 [翻译贡献指南](#翻译贡献指南) |
-
-### 前置要求
-
-**仅翻译/打补丁：**
-- Python 3.8+
-- Git
-
-**完整构建（仅开发者）：**
-- Node.js 24+
-- pnpm（`npm i -g pnpm`）
-- Rust（stable toolchain）
-- Tauri 构建依赖（参考 [Tauri 文档](https://tauri.app/start/prerequisites/)）
-
-### `localize.py` 命令参考
+#### 构建流程
 
 ```bash
-# 完整流程：克隆仓库 → 生成中文语料 → 应用补丁 → 可选构建
-python localize.py --all
-
-# 仅生成中文 JSON（基于机器翻译，需人工校对）
-python localize.py --translate
-
-# 仅应用源码补丁（手动维护 zh-CN 语料后）
-python localize.py --patch
-
-# 应用补丁后自动构建
-python localize.py --patch --build
-
-# 检查翻译完整性
-python localize.py --check
-
-# 指定 Voltius 仓库路径
-python localize.py --repo /path/to/voltius --patch
-```
-
-| 参数 | 简写 | 说明 |
-|------|------|------|
-| `--all` | `-a` | 完整流程：克隆+翻译+补丁 |
-| `--translate` | `-t` | 生成中文 JSON 语料 |
-| `--patch` | `-p` | 应用源码补丁 |
-| `--build` | `-b` | 自动构建（需与 `--patch` 配合） |
-| `--check` | | 检查翻译完整性 |
-| `--repo PATH` | `-r` | 指定 Voltius 仓库路径 |
-| `--verbose` | `-v` | 详细日志输出 |
-
-### 一键汉化
-
-```bash
-./quick-patch.sh          # 克隆 + 翻译 + 打补丁
-
-cd voltius
-pnpm install
-pnpm tauri dev            # 开发模式测试
-pnpm tauri build          # 构建安装包
-```
-
----
-
-## 使用 GitHub Actions 构建
-
-本项目已配置好 `.github/workflows/build-all-platforms.yml`，可自动构建全平台：
-
-- Windows（x64 / ARM64）
-- macOS（Intel / Apple Silicon）
-- Linux（x64 / ARM64）- deb / rpm / AppImage
-- Android（ARM64 APK）
-
-### 触发构建
-
-**方式 1：手动触发（推荐）**
-
-1. 进入你的 GitHub 仓库 → **Actions** 标签
-2. 左侧选择 **构建全平台汉化版**
-3. 点击 **Run workflow**，输入 Voltius 上游版本（如 `v0.9.2`）
-4. 等待约 30-40 分钟（并行构建）
-
-**方式 2：修改翻译后自动触发**
-
-```bash
-git add locales/zh-CN/
-git commit -m "改进翻译: 完善 common.json"
-git push origin main
-```
-
-**方式 3：打 tag 发布 Release**
-
-```bash
-git tag zh-v0.9.2-1
-git push origin zh-v0.9.2-1
-```
-
-### 下载产物
-
-- **Artifacts**（构建产物，有效期 90 天）：Actions → 对应 workflow → 底部 Artifacts
-- **Releases**（正式发布）：仓库 Releases 页面，直接下载安装包
-
-### 构建时间估算
-
-| 平台 | 耗时 | Actions 分钟数 |
-|------|------|---------------|
-| Windows x64 / ARM64 | 各 10-15 分钟 | ~15 分钟 |
-| macOS Intel / M1 | 各 15-20 分钟 | ~20 分钟 |
-| Linux x64 / ARM64 | 各 8-12 分钟 | ~12 分钟 |
-| Android | 12-18 分钟 | ~18 分钟 |
-| **总计（并行）** | **30-40 分钟** | **~112 分钟** |
-
-> GitHub 免费额度：公开仓库无限，私有仓库每月 2000 分钟。
-
-### 仅构建特定平台
-
-编辑 `.github/workflows/build-all-platforms.yml`，在 `matrix.include` 中注释掉不需要的平台。
-
-### 代码签名（可选）
-
-自己构建的版本没有官方签名，Windows SmartScreen / macOS Gatekeeper 会警告"未识别的应用"。代码开源透明，可安全绕过：
-
-- **Windows**：点击 **更多信息** → **仍要运行**
-- **macOS**：右键 → **打开**（仅首次）
-
-如需正式签名：Windows 需购买代码签名证书（.pfx）；macOS 需 Apple Developer 账号（99 USD/年）+ 公证；Android 需替换调试密钥为正式密钥。将证书 Base64 编码后配置到 GitHub Secrets，并在 workflow 中添加签名步骤。
-
-### Tauri 更新签名密钥（必需）
-
-上游 Voltius 的 `tauri.conf.json` 启用了 updater 插件并内置了公钥，构建时 Tauri 要求提供对应的私钥来签名更新包，否则构建会报错：
-
-```
-Error: A public key has been found, but no private key. Make sure to set `TAURI_SIGNING_PRIVATE_KEY` environment variable.
-```
-
-因此汉化版需生成自己的签名密钥对，`localize.py` 会在打补丁时用汉化版公钥替换上游 pubkey（见 `patch_tauri_pubkey`）。
-
-#### 快捷方式：一键脚本（推荐）
-
-项目提供 `setup-tauri-signing.sh` 自动完成全部配置：生成密钥对、上传 GitHub Secrets、更新 `localize.py` 公钥、备份密钥。
-
-```bash
-# 需要 GitHub Token（repo + workflow 权限）
-export GITHUB_TOKEN="ghp_xxxxxxxxxxxxx"
-
-# 依赖: npx (Node.js) / python3 + pynacl / jq / openssl
-pip install pynacl
-
-./setup-tauri-signing.sh
-```
-
-脚本会交互确认后执行，密钥备份到 `~/.voltius-zh-keys-backup-<时间戳>/`。若需手动操作，参考以下步骤。
-
-#### 步骤 1：生成密钥对
-
-```bash
-# 生成一个强密码并保存
-SIGN_PW=$(openssl rand -base64 18)
-echo "$SIGN_PW"   # 请妥善保存此密码
-
-# 生成 Tauri 签名密钥对（minisign 格式）
-npx --yes @tauri-apps/cli@latest signer generate \
-  -w voltius_zh.key -p "$SIGN_PW"
-
-# 产出:
-#   voltius_zh.key      私钥（绝密，丢失将无法签名更新）
-#   voltius_zh.key.pub  公钥（可公开，用于验证更新包）
-```
-
-将公钥内容填入 `localize.py` 的 `patch_tauri_pubkey()` 中的 `NEW_PUBKEY` 变量。
-
-#### 步骤 2：通过 API 配置 GitHub Secrets
-
-GitHub Secrets 需用仓库公钥进行 NaCl 加密后上传（非明文），需安装 `PyNaCl`（`pip install pynacl`）：
-
-```bash
-export GITHUB_TOKEN="你的_GitHub_Token"
-export GH_REPO="你的用户名/voltius-zh-CN"
-
-# 获取仓库公钥
-curl -s -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-  -H "Accept: application/vnd.github+json" \
-  "https://api.github.com/repos/${GH_REPO}/actions/secrets/public-key" \
-  > /tmp/repo_pubkey.json
-
-# 加密并上传两个 Secret
-python3 - <<'PYEOF'
-import json, base64, os, urllib.request
-from nacl import public, encoding
-
-TOKEN = os.environ["GITHUB_TOKEN"]
-REPO = os.environ["GH_REPO"]
-pk = json.load(open("/tmp/repo_pubkey.json"))
-key_id = pk["key_id"]
-box = public.SealedBox(public.PublicKey(pk["key"].encode(), encoding.Base64Encoder()))
-
-def put_secret(name, value):
-    payload = json.dumps({
-        "encrypted_value": base64.b64encode(box.encrypt(value.encode())).decode(),
-        "key_id": key_id,
-    }).encode()
-    req = urllib.request.Request(
-        f"https://api.github.com/repos/{REPO}/actions/secrets/{name}",
-        data=payload, method="PUT",
-        headers={"Authorization": f"Bearer {TOKEN}",
-                 "Accept": "application/vnd.github+json"})
-    urllib.request.urlopen(req)
-    print(f"✅ {name} 已配置")
-
-put_secret("TAURI_SIGNING_PRIVATE_KEY", open("voltius_zh.key").read().strip())
-put_secret("TAURI_SIGNING_PRIVATE_KEY_PASSWORD", os.environ.get("SIGN_PW", ""))
-PYEOF
-
-unset GITHUB_TOKEN
-```
-
-也可在网页手动配置：仓库 **Settings → Secrets and variables → Actions → New repository secret**，分别添加：
-
-| Secret 名称 | 内容 |
-|-------------|------|
-| `TAURI_SIGNING_PRIVATE_KEY` | `voltius_zh.key` 私钥文件的完整内容 |
-| `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` | 步骤 1 生成的密码 |
-
-workflow 的构建步骤已通过 `env` 注入这两个变量，配置后即可正常构建签名的更新包。
-
-> ⚠️ 私钥和密码务必备份到密码管理器。丢失后无法为已发布版本签名新的更新，用户将无法自动更新。
-
----
-
-## 本地构建
-
-```bash
-# 1. 克隆本项目
-git clone https://github.com/你的用户名/voltius-zh-CN.git
+# 1. 克隆仓库
+git clone https://github.com/iflyelf/voltius-zh-CN.git
 cd voltius-zh-CN
 
-# 2. 一键汉化（需 Python + Git）
-python localize.py --all
+# 2. 运行汉化脚本（克隆上游 + 应用补丁 + 构建）
+python3 localize.py --build
 
-# 3. 构建（需 Node.js 24+ / pnpm / Rust / 平台构建工具）
-cd voltius
-pnpm install
-pnpm tauri build
-
-# 4. 产物位置
-# Windows: voltius/target/release/bundle/msi/Voltius_0.9.2_x64_zh-CN.msi
-#          voltius/target/release/bundle/nsis/Voltius_0.9.2_x64-setup.exe
-# 其他平台: voltius/target/release/bundle/
+# 3. 产物位置
+# Windows: voltius/target/release/bundle/msi/Voltius_*.msi
+#          voltius/target/release/bundle/nsis/Voltius_*-setup.exe
+# macOS:   voltius/target/release/bundle/dmg/Voltius_*.dmg
+# Linux:   voltius/target/release/bundle/appimage/Voltius_*.AppImage
+#          voltius/target/release/bundle/deb/voltius_*.deb
 ```
 
-### 跨平台构建（Docker）
+### GitHub Actions 自动构建
+
+推送代码或创建 tag 会自动触发多平台构建：
 
 ```bash
-docker build -f Dockerfile.cross-compile -t voltius-cross .
+# 触发构建（推送 tag）
+git tag zh-v0.9.2-1 -m "Voltius 0.9.2 简体中文版"
+git push origin zh-v0.9.2-1
 
-# Windows ARM64
-docker run --rm -v "$(pwd):/project" voltius-cross \
-  bash -c 'pnpm tauri build --target aarch64-pc-windows-msvc --runner cargo-xwin'
-
-# Linux x64
-docker run --rm -v "$(pwd):/project" voltius-cross \
-  bash -c 'pnpm tauri build --target x86_64-unknown-linux-gnu'
+# 手动触发（在 GitHub Actions 页面点击 "Run workflow"）
 ```
 
-### 更新上游
+**构建时间**：约 15-25 分钟（并行构建 7 个平台）
+
+### 翻译贡献
+
+#### 编辑语料文件
 
 ```bash
-cd voltius
-git remote add upstream https://github.com/VoltiusApp/voltius.git
-git fetch upstream
-git merge upstream/main
+# 直接编辑 JSON（推荐）
+vim locales/zh-CN/layout.json
 
-# 检查 en 语料是否有新增，对应更新 locales/zh-CN/
-cd .. && python localize.py --translate
+# 检查翻译完整性
+python3 localize.py --check-translation
 ```
 
----
-
-## 翻译贡献指南
-
-### 翻译原则
-
-1. **准确性** — 理解上下文含义，避免直译；技术术语保持专业性；参考[术语表](#术语表)
-2. **一致性** — 相同概念使用相同译名；参考 Windows/macOS 系统术语；风格统一
-3. **可读性** — 符合中文表达习惯，避免欧化长句，适当使用标点和空格
-
-### 翻译流程
+#### 提交 PR
 
 ```bash
-# 方式 1: 直接编辑 JSON（推荐）
-vim locales/zh-CN/common.json
-python3 localize.py --check       # 检查完整性
-python3 localize.py --patch       # 应用到仓库
-cd voltius && pnpm tauri dev       # 本地测试
-
-# 方式 2: 机器翻译辅助（分批处理避免限流）
-python3 batch-translate.py --file common.json --delay 0.5
-vim locales/zh-CN/common.json      # 人工校对
-python3 localize.py --patch
-```
-
-### 质量检查清单
-
-- [ ] 保留所有 `{{变量}}`，不要翻译占位符
-- [ ] JSON 格式正确（用 `jq . file.json` 验证）
-- [ ] 占位符前后空格完整（如 `{{count}} 个主机`，机翻常吞掉空格）
-- [ ] 无错别字
-- [ ] 专业术语符合术语表
-
-### 上下文相关翻译
-
-某些英文词在不同场景下译法不同，需人工判断：
-
-| 英文 | 场景 | 中文 |
-|------|------|------|
-| Host | 服务器设备 | 主机 |
-| Host | 主机名（域名） | 主机名 |
-| Key | SSH 密钥 | 密钥 |
-| Key | 键盘按键 | 按键 |
-| Terminal | 应用名称 | Terminal（保留） |
-| Terminal | 终端界面 | 终端 |
-
-> 提示：参考 `src/i18n/locales/en/` 对应文件查看完整上下文。
-
-### 文件优先级（按使用频率）
-
-| 文件 | 说明 | 重要性 |
-|------|------|--------|
-| `common.json` | 通用 UI 词汇 | ⭐⭐⭐ |
-| `layout.json` | 主界面/导航/菜单 | ⭐⭐⭐ |
-| `settings.json` | 设置页面（最大文件，567 条） | ⭐⭐⭐ |
-| `hosts.json` | 主机管理 | ⭐⭐ |
-| `terminal.json` | 终端功能 | ⭐⭐ |
-| `fileTransfer.json` | SFTP 文件传输 | ⭐⭐ |
-| `connections.json` | 连接管理 | ⭐⭐ |
-| 其他 | 次要功能 | ⭐ |
-
-### 提交 PR
-
-```bash
-git checkout -b translate-common
-vim locales/zh-CN/common.json
-git add locales/zh-CN/common.json
-git commit -m "翻译: 完善 common.json 中的通用术语"
-git push origin translate-common
+git checkout -b improve-translation
+git add locales/zh-CN/
+git commit -m "improve: 优化术语翻译"
+git push origin improve-translation
 # 在 GitHub 上创建 Pull Request
 ```
 
-PR 标题格式示例：
-- `翻译: 完成 common.json`
-- `修正: settings.json 中"端口转发"术语不一致`
-- `新增: 补充 terminal.json 缺失条目`
+### 术语表
+
+| 英文 | 中文 | 说明 |
+|------|------|------|
+| Vault | 保管库 | 不译为"金库/保险库" |
+| Connection | 连接 | SSH 连接配置 |
+| Host | 主机 | 远程服务器 |
+| Key | 密钥 | SSH 密钥对 |
+| Snippet | 代码片段 | 命令模板 |
+| Port Forwarding | 端口转发 | 隧道功能 |
+| Identity | 身份 | SSH 身份认证 |
 
 ---
 
-## 术语表
+## ❓ 常见问题
 
-完整术语表见 [`translations/glossary.json`](translations/glossary.json)。核心术语：
+### Q: 为什么不能直接打补丁到已安装的 Voltius？
 
-### SSH / 网络
+**A**: Termius 是 Electron 应用（可解包 asar），Voltius 是 Tauri（Rust 编译成原生二进制，前端编译进 .exe）。Tauri 的架构决定了必须源码级重新构建。
 
-| English | 中文 | 备注 |
-|---------|------|------|
-| SSH / SFTP | SSH / SFTP | 保留英文 |
-| Host | 主机 | 服务器设备 |
-| Connection | 连接 | |
-| Session | 会话 | |
-| Port Forwarding | 端口转发 | |
-| Jump Host | 跳板机 | 或"堡垒机" |
-| Tunnel | 隧道 | |
-| Local / Remote / Dynamic | 本地 / 远程 / 动态 | |
-| Keychain | 密钥链 | |
-| Vault | 保管库 | |
-| Snippet | 代码片段 | |
+### Q: 汉化版安装后会覆盖原版数据吗？
 
-### UI 通用
+**A**: 不会。Voltius 的数据存储在系统 keychain/数据目录，安装包只替换可执行文件，数据完全保留。
 
-| English | 中文 | | English | 中文 |
-|---------|------|-|---------|------|
-| Settings | 设置 | | Save | 保存 |
-| Preferences | 偏好设置 | | Cancel | 取消 |
-| General | 通用 | | Delete | 删除 |
-| Appearance | 外观 | | Remove | 移除 |
-| Theme | 主题 | | Add | 添加 |
-| Font | 字体 | | Create | 创建 |
-| Language | 语言 | | Edit | 编辑 |
-| Account | 账号 | | Rename | 重命名 |
-| Profile | 个人资料 | | Connect / Disconnect | 连接 / 断开连接 |
+### Q: 自建服务器安全吗？
 
----
+**A**: 数据采用端到端加密（Argon2id + XChaCha20-Poly1305），服务器只存储密文。即使服务器被攻破，攻击者也无法解密数据。**前提是密码强度足够**。
 
-## 常见问题
+### Q: 为什么 ARM64 Linux 构建有时失败？
 
-**Q: 安装汉化版会丢失数据吗？**
-不会。汉化版可直接覆盖官方版安装，所有主机/密钥/设置都会保留，也无需卸载旧版本。
+**A**: GitHub Actions 的 ARM runner 网络不稳定，Rust 编译时下载 crates 可能超时。CI 已配置强制 IPv4 + 重试机制，失败时会自动重试。
 
-**Q: 安装后找不到中文选项？**
-确认下载的文件名包含 `_zh-CN` 且来自本项目 Releases 页面。然后在 **Settings → Language** 选择"简体中文"。
+### Q: 官方 Voltius 更新后如何同步？
 
-**Q: 部分界面还是英文？**
-翻译可能尚未完整覆盖，欢迎在 Issues 反馈或提交 PR 补充。
+**A**: 
+```bash
+python3 localize.py --update-upstream v0.9.3  # 拉取上游 v0.9.3
+python3 localize.py --check-translation        # 检查 en 新增的条目
+# 手动翻译新增条目
+git commit -am "sync: 同步上游 v0.9.3"
+git push origin main
+```
 
-**Q: 会被自动更新覆盖回英文版吗？**
-如果 Voltius 有内置自动更新，可能会。重新下载对应汉化版安装即可。
+### Q: 可以商用吗？
 
-**Q: 构建失败怎么办？**
-查看失败 job 的日志，常见原因：依赖安装失败（重跑）、Rust 编译错误（检查 patch 逻辑）、上游 API 变更（更新 `localize.py`）。
-
-**Q: 为什么不能 100% 翻译？**
-Google Translate API 批量翻译时会触发严重限流；部分专业术语需人工校对；占位符变量需特殊处理。建议小批量处理或使用其他翻译服务。
+**A**: Voltius 客户端采用 AGPLv3 协议，**允许商用但必须开源**。自建服务器代码同样遵循 AGPLv3。如果在企业内部使用且不分发，则无需公开源码。**推荐小团队（<20人）使用，大型企业请购买官方订阅支持开发者**。
 
 ---
 
-## 许可证
+## 📊 功能对比
 
-- 本汉化工具：**MIT**
-- Voltius 本体：**AGPLv3**（插件为 MIT）
+| 功能 | 官方免费版 | 官方 Pro ($8/月) | **汉化版 + 自建服务器** |
+|------|-----------|-----------------|----------------------|
+| 界面语言 | 英语/法语 | 英语/法语 | ✅ **简体中文** |
+| 保管库数量 | 1 个 | 无限制 | ✅ **无限制** |
+| 云同步 | ❌ | ✅ | ✅ **自建服务器** |
+| 多设备同步 | ❌ | ✅ | ✅ **SSE 实时推送** |
+| 团队保险库 | ❌ | ❌ | ✅ **支持** |
+| 数据掌控 | 官方服务器 | 官方服务器 | ✅ **完全自主** |
+| 端到端加密 | ✅ | ✅ | ✅ **同样安全** |
+| 费用 | 免费 | $8/月 | ✅ **免费（仅服务器成本）** |
 
 ---
 
-## 致谢
+## 📝 许可证
 
-- [Voltius](https://github.com/VoltiusApp/voltius) 官方团队 — 优秀的开源 SSH 客户端及标准 i18n 框架
-- [ArcSurge/Termius-Pro-zh_CN](https://github.com/ArcSurge/Termius-Pro-zh_CN) — 提供思路参考
-- Google Translate / deep-translator — 机器翻译支持
-- 所有社区贡献者
+- **Voltius 客户端**：[AGPLv3](https://github.com/VoltiusApp/voltius/blob/main/LICENSE)（原项目协议）
+- **本汉化项目**：AGPLv3（包含客户端补丁和服务器代码）
+
+**说明**：
+- AGPLv3 允许自由使用、修改、分发，但要求衍生作品也必须开源
+- 自建服务器用于个人/小团队内部使用时，无需公开源码
+- 如果提供网络服务（SaaS），必须向用户提供源码
+
+---
+
+## 🙏 致谢
+
+- [Voltius](https://github.com/VoltiusApp/voltius) - 优秀的开源 SSH 客户端
+- [Tauri](https://tauri.app/) - 现代化跨平台框架
+- [i18next](https://www.i18next.com/) - 国际化框架
+- 所有贡献翻译的开发者
+
+---
+
+## 🔗 相关链接
+
+- **原项目**: https://github.com/VoltiusApp/voltius
+- **本项目**: https://github.com/iflyelf/voltius-zh-CN
+- **官方网站**: https://voltius.app
+- **官方订阅**: https://voltius.app/pricing (支持开发者)
+- **问题反馈**: https://github.com/iflyelf/voltius-zh-CN/issues
+
+---
+
+**最后更新**: 2026-07-16  
+**Voltius 版本**: v0.9.2  
+**翻译覆盖率**: 95.1% (2526/2656)  
+**服务器版本**: 1.0.0
