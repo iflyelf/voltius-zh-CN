@@ -69,10 +69,10 @@ jobs:
           fi
 
           if [[ "$TAG" == "main" ]]; then
-            python3 localize.py --repo voltius --translate --patch
+            python3 localize.py --repo voltius --patch
           else
             git clone --depth 1 --branch "$TAG" https://github.com/VoltiusApp/voltius.git voltius
-            python3 localize.py --translate --patch
+            python3 localize.py --patch
           fi
       
       - name: 提取版本号
