@@ -23,11 +23,11 @@ PLUGIN_META_TRANSLATIONS = {
         'description: "Manage Docker containers, images, volumes, and networks for local and SSH sessions."':
             'description: "管理本地和 SSH 会话的 Docker 容器、镜像、卷和网络。"',
         'label: "Automatic update checks"': 'label: "自动检查更新"',
-        '"Check images against their registries when the Images view opens. A manual “check updates” button is always available regardless of this setting."':
-            '"打开镜像视图时对照镜像仓库检查镜像。无论此设置如何，手动"检查更新"按钮始终可用。"',
+        '"Check images against their registries when the Images view opens. A manual \u201ccheck updates\u201d button is always available regardless of this setting."':
+            '"打开镜像视图时对照镜像仓库检查镜像。无论此设置如何，手动\u201c检查更新\u201d按钮始终可用。"',
         'label: "Re-check interval (hours)"': 'label: "重新检查间隔（小时）"',
-        '"Cached results are reused within this window to avoid registry rate limits. Resolving registry digests uses docker buildx; hosts without it show images as “unknown” rather than reporting a false update."':
-            '"在此时间窗口内复用缓存结果，以避免触发镜像仓库的速率限制。解析镜像仓库摘要使用 docker buildx；不支持它的主机会将镜像显示为"unknown"，而不是报告错误的更新。"',
+        '"Cached results are reused within this window to avoid registry rate limits. Resolving registry digests uses docker buildx; hosts without it show images as \u201cunknown\u201d rather than reporting a false update."':
+            '"在此时间窗口内复用缓存结果，以避免触发镜像仓库的速率限制。解析镜像仓库摘要使用 docker buildx；不支持它的主机会将镜像显示为\u201cunknown\u201d，而不是报告错误的更新。"',
         'label: "Recreate containers after pulling"': 'label: "拉取后重建容器"',
         '"After pulling an update, recreate the containers using that image so they actually run the new version. Compose services are recreated via compose; standalone containers are rebuilt from their docker run config. When off, the image is only pulled."':
             '"拉取更新后，使用该镜像重建容器，使其实际运行新版本。Compose 服务通过 compose 重建；独立容器则根据其 docker run 配置重建。关闭时仅拉取镜像。"',

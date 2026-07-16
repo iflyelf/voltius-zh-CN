@@ -564,35 +564,33 @@ jobs:
             exit 1
           fi
       
-      - name: 删除旧版本 Release
+      - name: 删除旧版本 Release（只保留刚发布的）
         if: success()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "🗑️ 清理旧版本 Release（只保留最新）"
-          
-          # 获取所有 zh-v* release，按创建时间排序
+          # 确定刚发布的 tag（要保留的）
+          if [[ "${{ github.ref }}" == refs/tags/zh-v* ]]; then
+            KEEP_TAG="${{ github.ref_name }}"
+          else
+            KEEP_TAG="zh-v${{ needs.prepare-localized-source.outputs.version }}-${{ github.run_number }}"
+          fi
+          echo "🗑️ 清理旧版本 Release（保留最新: $KEEP_TAG）"
+
+          # 获取所有 zh-v* release，删除除 KEEP_TAG 外的全部
           RELEASES=$(gh release list --repo "${{ github.repository }}" \
             --limit 100 \
-            --json tagName,createdAt \
-            --jq '.[] | select(.tagName | startswith("zh-v")) | .tagName' \
-            | head -n -1)  # 排除最新的一个
-          
-          if [ -z "$RELEASES" ]; then
-            echo "✅ 没有旧版本需要删除"
-            exit 0
-          fi
-          
-          echo "以下旧版本将被删除："
-          echo "$RELEASES"
-          
+            --json tagName \
+            --jq '.[] | select(.tagName | startswith("zh-v")) | .tagName')
+
           for TAG in $RELEASES; do
-            echo "删除 $TAG..."
-            gh release delete "$TAG" --repo "${{ github.repository }}" --yes || true
-            git push --delete origin "$TAG" 2>/dev/null || true
+            if [ "$TAG" != "$KEEP_TAG" ]; then
+              echo "删除旧版本 $TAG ..."
+              gh release delete "$TAG" --repo "${{ github.repository }}" --yes --cleanup-tag || true
+            fi
           done
-          
-          echo "✅ 旧版本清理完成"
+
+          echo "✅ 旧版本清理完成，当前仅保留: $KEEP_TAG"
       
   # ============================================================
   # 清理旧的 workflow 记录
