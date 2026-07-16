@@ -298,6 +298,17 @@ def patch_locale_store(repo):
         log.error("❌ 无法定位 localeStore.ts 中的 Locale 类型或 SUPPORTED_LOCALES")
         sys.exit(1)
 
+    # 默认语言改为简体中文
+    new_src, n3 = re.subn(
+        r'locale: "en",',
+        'locale: "zh-CN",',
+        new_src,
+    )
+    if n3 == 0:
+        log.warning("  ⚠️ 未找到默认 locale 定义，默认语言未修改")
+    else:
+        log.info("  ✅ 默认语言设为简体中文")
+
     path.write_text(new_src, encoding="utf-8")
     log.info("  ✅ 已修改 src/stores/localeStore.ts")
 
@@ -567,6 +578,30 @@ def patch_builtin_themes_font(repo, default_size=16):
         log.warning("  ⚠️ 未找到主题加载逻辑，跳过")
 
 
+def patch_default_settings(repo):
+    """修改默认设置：关闭滚动小地图。"""
+    path = Path(repo) / "src" / "stores" / "toggleSettingsStore.ts"
+    if not path.exists():
+        log.warning("  ⚠️ 未找到 toggleSettingsStore.ts，跳过")
+        return
+
+    src = path.read_text(encoding="utf-8")
+
+    # 关闭滚动小地图默认值
+    pattern = re.compile(
+        r'("scroll-minimap": \{[^}]*default: )true',
+        re.DOTALL
+    )
+    new_src, n = pattern.subn(r'\1false', src)
+    
+    if n == 0:
+        log.warning("  ⚠️ 未找到 scroll-minimap 默认值，跳过")
+        return
+    
+    path.write_text(new_src, encoding="utf-8")
+    log.info("  ✅ 滚动小地图默认关闭")
+
+
 def do_patch(repo):
     log.info("🛠️ 应用源码补丁到 %s", repo)
     copy_locales_to_repo(repo)
@@ -579,6 +614,7 @@ def do_patch(repo):
     patch_add_flexoki_theme(repo)  # 先注入 Flexoki 主题
     patch_default_theme(repo)      # 再设默认为 flexoki-light
     patch_builtin_themes_font(repo)  # 最后统一改字体（包括新注入的）
+    patch_default_settings(repo)   # 默认设置：关闭滚动小地图
     log.info("✅ 补丁应用完成")
 
 
