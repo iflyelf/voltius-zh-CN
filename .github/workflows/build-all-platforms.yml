@@ -167,10 +167,27 @@ jobs:
       - name: 安装系统依赖 (Ubuntu)
         if: matrix.platform == 'ubuntu-latest' || matrix.platform == 'ubuntu-24.04-arm'
         run: |
-          # 修复 ARM64 runner IPv6 网络不可达问题
+          # 修复 ARM64 runner 网络问题
           if [[ "${{ matrix.platform }}" == "ubuntu-24.04-arm" ]]; then
             echo 'Acquire::ForceIPv4 "true";' | sudo tee /etc/apt/apt.conf.d/99force-ipv4
             echo 'Acquire::Retries "5";' | sudo tee -a /etc/apt/apt.conf.d/99force-ipv4
+            # ports.ubuntu.com 经常超时,切换到可靠镜像(ARM64 用 ubuntu-ports)
+            echo "🔀 切换 ARM64 apt 源到镜像"
+            sudo cp /etc/apt/sources.list.d/ubuntu.sources /etc/apt/sources.list.d/ubuntu.sources.bak 2>/dev/null || true
+            # GitHub runner 在 Azure 上,优先 Azure 镜像(同机房最快),备用其他
+            for MIRROR in "http://azure.ports.ubuntu.com/ubuntu-ports" "https://mirrors.edge.kernel.org/ubuntu-ports" "http://ports.ubuntu.com/ubuntu-ports"; do
+              echo "尝试镜像: $MIRROR"
+              sudo find /etc/apt -name '*.sources' -exec sed -i "s|http://ports.ubuntu.com/ubuntu-ports|$MIRROR|g; s|https://ports.ubuntu.com/ubuntu-ports|$MIRROR|g" {} \; 2>/dev/null || true
+              sudo find /etc/apt -name '*.list' -exec sed -i "s|http://ports.ubuntu.com/ubuntu-ports|$MIRROR|g; s|https://ports.ubuntu.com/ubuntu-ports|$MIRROR|g" {} \; 2>/dev/null || true
+              if sudo apt-get update 2>/dev/null; then
+                echo "✅ 镜像 $MIRROR 可用"
+                break
+              fi
+              echo "⚠️ $MIRROR 不可用,尝试下一个"
+              # 恢复原始源以便替换下一个镜像
+              sudo find /etc/apt -name '*.sources' -exec sed -i "s|$MIRROR|http://ports.ubuntu.com/ubuntu-ports|g" {} \; 2>/dev/null || true
+              sudo find /etc/apt -name '*.list' -exec sed -i "s|$MIRROR|http://ports.ubuntu.com/ubuntu-ports|g" {} \; 2>/dev/null || true
+            done
           fi
           
           # 更新并安装依赖,失败时清理缓存重试(ARM64 网络极不稳定)
