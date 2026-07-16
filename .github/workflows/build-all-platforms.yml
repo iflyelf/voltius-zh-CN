@@ -250,16 +250,37 @@ jobs:
           # 根据平台重命名
           case "${{ matrix.platform }}" in
             ubuntu*)
-              # Linux: .deb, .rpm, .AppImage
-              for ext in deb rpm AppImage; do
-                if compgen -G "*.$ext" > /dev/null; then
-                  for file in *.$ext; do
-                    newname="${file%.$ext}_zh-CN.$ext"
-                    mv "$file" "$newname"
-                    echo "✅ 重命名: $file -> $newname"
-                  done
-                fi
-              done
+              # Linux: .deb (deb/), .rpm (rpm/), .AppImage (appimage/) 在各自子目录
+              if [ -d "deb" ]; then
+                cd deb
+                for file in *.deb; do
+                  [ -f "$file" ] || continue
+                  newname="${file%.deb}_zh-CN.deb"
+                  mv "$file" "$newname"
+                  echo "✅ 重命名: $file -> $newname"
+                done
+                cd ..
+              fi
+              if [ -d "rpm" ]; then
+                cd rpm
+                for file in *.rpm; do
+                  [ -f "$file" ] || continue
+                  newname="${file%.rpm}_zh-CN.rpm"
+                  mv "$file" "$newname"
+                  echo "✅ 重命名: $file -> $newname"
+                done
+                cd ..
+              fi
+              if [ -d "appimage" ]; then
+                cd appimage
+                for file in *.AppImage; do
+                  [ -f "$file" ] || continue
+                  newname="${file%.AppImage}_zh-CN.AppImage"
+                  mv "$file" "$newname"
+                  echo "✅ 重命名: $file -> $newname"
+                done
+                cd ..
+              fi
               ;;
             windows*)
               # Windows: .msi, .exe
