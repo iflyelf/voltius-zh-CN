@@ -455,6 +455,82 @@ def patch_default_theme(repo, theme_id="tokyo-night"):
     log.info("  ✅ 默认主题设为: %s", theme_id)
 
 
+def patch_builtin_themes_font(repo, default_size=16):
+    """将所有内置主题的字体大小改为指定值 (默认 16)，并允许编辑。"""
+    # 1. 修改 presets.ts 字体大小
+    path = Path(repo) / "src" / "themes" / "presets.ts"
+    if not path.exists():
+        log.warning("  ⚠️ 未找到 presets.ts，跳过字体修改")
+        return
+
+    src = path.read_text(encoding="utf-8")
+    # 替换所有 uiFontSize 和 terminalFontSize
+    src = re.sub(r'uiFontSize: \d+', f'uiFontSize: {default_size}', src)
+    src = re.sub(r'terminalFontSize: \d+', f'terminalFontSize: {default_size}', src)
+    path.write_text(src, encoding="utf-8")
+    log.info("  ✅ 内置主题字体大小改为: %d", default_size)
+
+    # 2. 允许编辑内置主题（在 185 行条件后增加内置主题的编辑按钮）
+    appearance_path = Path(repo) / "src" / "components" / "settings" / "sections" / "AppearanceSection.tsx"
+    if not appearance_path.exists():
+        log.warning("  ⚠️ 未找到 AppearanceSection.tsx，跳过编辑权限修改")
+        return
+
+    src = appearance_path.read_text(encoding="utf-8")
+    # 在 185-213 行的 {!theme.builtIn && (...)} 后面添加一个内置主题专用的编辑按钮块
+    pattern = re.compile(
+        r'(\{!theme\.builtIn && \(\s*<div className="absolute bottom-2 right-2 flex gap-1">.*?</div>\s*\)\})',
+        re.DOTALL
+    )
+    replacement = r'''\1
+                {theme.builtIn && (
+                  <div className="absolute bottom-2 right-2 flex gap-1">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); openThemeCreator(theme.id); }}
+                      className="p-1 rounded-sm opacity-0 group-hover:opacity-50 hover:opacity-100! transition-opacity text-(--t-text-muted)"
+                      title={t("settings.appearance.editTheme")}
+                      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--t-text-primary)"; }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.color = "var(--t-text-muted)"; }}
+                    >
+                      <Icon icon="lucide:pencil" width={11} />
+                    </button>
+                  </div>
+                )}'''
+    new_src, n = pattern.subn(replacement, src)
+    if n > 0:
+        appearance_path.write_text(new_src, encoding="utf-8")
+        log.info("  ✅ 内置主题现在可编辑")
+    else:
+        log.warning("  ⚠️ 未找到编辑按钮逻辑，跳过")
+
+    # 3. 编辑内置主题时创建副本（避免 builtIn 冲突）
+    creator_path = Path(repo) / "src" / "components" / "theme-creator" / "ThemeCreator.tsx"
+    if not creator_path.exists():
+        log.warning("  ⚠️ 未找到 ThemeCreator.tsx，跳过副本逻辑")
+        return
+
+    src = creator_path.read_text(encoding="utf-8")
+    # 找到 524-531 行的逻辑：加载 existing 主题
+    # 如果是内置主题(builtIn:true)，生成新 id 并设 builtIn:false
+    pattern = re.compile(
+        r'(if \(existing\) \{\s*const d = JSON\.parse\(JSON\.stringify\(existing\)\);)',
+        re.DOTALL
+    )
+    replacement = r'''\1
+        // 汉化版: 编辑内置主题时创建副本
+        if (existing.builtIn) {
+          d.id = `custom-${Date.now()}`;
+          d.name = `${existing.name} (副本)`;
+          d.builtIn = false;
+        }'''
+    new_src, n = pattern.subn(replacement, src)
+    if n > 0:
+        creator_path.write_text(new_src, encoding="utf-8")
+        log.info("  ✅ 编辑内置主题时自动创建副本")
+    else:
+        log.warning("  ⚠️ 未找到主题加载逻辑，跳过")
+
+
 def do_patch(repo):
     log.info("🛠️ 应用源码补丁到 %s", repo)
     copy_locales_to_repo(repo)
@@ -465,6 +541,7 @@ def do_patch(repo):
     patch_force_pro(repo)
     patch_plugins_i18n(repo)
     patch_default_theme(repo)
+    patch_builtin_themes_font(repo)
     log.info("✅ 补丁应用完成")
 
 
