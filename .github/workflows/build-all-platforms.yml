@@ -507,31 +507,41 @@ jobs:
           
           # 收集各平台二进制文件（排除 .zip 压缩包）
           cd artifacts
-          find . -name "*_zh-CN.*" \
-            ! -name "*.zip" \
-            ! -name "*.tar.*" \
-            ! -name "*.blockmap" \
-            -type f \
-            -exec echo "✅ 上传: {}" \;
+          FILES=$(find . -type f \
+            \( -name "*_zh-CN.msi" \
+            -o -name "*_zh-CN.exe" \
+            -o -name "*_zh-CN.dmg" \
+            -o -name "*_zh-CN.deb" \
+            -o -name "*_zh-CN.rpm" \
+            -o -name "*_zh-CN.AppImage" \
+            -o -name "*_zh-CN.apk" \) \
+            | sed 's|^\./||')
           
+          echo "📦 待上传文件:"
+          echo "$FILES"
+          echo ""
+          
+          FILE_COUNT=$(echo "$FILES" | wc -l)
+          echo "✅ 共 $FILE_COUNT 个文件"
           cd ..
           
-          # 创建 Release 并上传（只上传安装包/二进制，不上传压缩包）
-          gh release create "$TAG" \
-            --repo "${{ github.repository }}" \
-            --title "Voltius ${VERSION} 简体中文版" \
-            --notes-file release-notes.md \
-            artifacts/**/*_zh-CN.msi \
-            artifacts/**/*_zh-CN.exe \
-            artifacts/**/*_zh-CN.dmg \
-            artifacts/**/*_zh-CN.deb \
-            artifacts/**/*_zh-CN.rpm \
-            artifacts/**/*_zh-CN.AppImage \
-            artifacts/**/*_zh-CN.apk \
-          || gh release upload "$TAG" \
-            artifacts/**/*_zh-CN.{msi,exe,dmg,deb,rpm,AppImage,apk} \
-            --repo "${{ github.repository }}" \
-            --clobber
+          # 创建 Release（只上传安装包/二进制）
+          if [ -n "$FILES" ]; then
+            # 转换为带 artifacts/ 前缀的路径列表
+            UPLOAD_FILES=$(echo "$FILES" | sed 's|^|artifacts/|' | tr '\n' ' ')
+            
+            gh release create "$TAG" \
+              --repo "${{ github.repository }}" \
+              --title "Voltius ${VERSION} 简体中文版" \
+              --notes-file release-notes.md \
+              $UPLOAD_FILES \
+            || gh release upload "$TAG" $UPLOAD_FILES \
+              --repo "${{ github.repository }}" \
+              --clobber
+          else
+            echo "❌ 未找到任何安装包文件"
+            exit 1
+          fi
       
       - name: 删除旧版本 Release
         if: success()
