@@ -308,6 +308,23 @@ def patch_locale_store(repo):
         log.warning("  ⚠️ 未找到默认 locale 定义，默认语言未修改")
     else:
         log.info("  ✅ 默认语言设为简体中文")
+    
+    # 强制迁移旧用户的 locale 存储到 zh-CN（防止 persist 覆盖默认值）
+    # 在 persist() 的配置里加 version 和 migrate
+    new_src, n4 = re.subn(
+        r'\{ name: "voltius-locale" \}',
+        '''{ name: "voltius-locale", version: 1, migrate: (persistedState: any, version: number) => {
+        if (version === 0 || !persistedState?.locale || persistedState.locale === "en") {
+          return { ...persistedState, locale: "zh-CN" as Locale };
+        }
+        return persistedState;
+      } }''',
+        new_src,
+    )
+    if n4 == 0:
+        log.warning("  ⚠️ 未找到 persist 配置，旧用户迁移未添加")
+    else:
+        log.info("  ✅ 添加旧用户 locale 强制迁移到 zh-CN")
 
     path.write_text(new_src, encoding="utf-8")
     log.info("  ✅ 已修改 src/stores/localeStore.ts")
