@@ -705,12 +705,11 @@ def patch_terminal_bold(repo):
 
 
 def patch_ssh_algorithms(repo):
-    """SSH 算法自动适配: 默认启用完整算法集(安全优先+旧算法后备)。
+    """SSH 连接健壮性增强,修复 10054 连接重置。
 
-    修复"命令行 ssh 能连,Voltius 报 10054/连接重置"的问题。
-    russh 默认算法集较窄,老服务器(旧 kex/cipher/mac)会握手失败被 RST。
-    legacy_preferred() 把旧算法追加在安全算法之后,保持安全优先排序,
-    等价于命令行 OpenSSH 的宽松兼容行为,无需用户手动开关。
+    1) 默认完整算法集(安全优先+旧算法后备),兼容各种服务器
+    2) 增强连接重试(3次→6次,退避更长),应对间歇性 RST
+       (Windows + russh 对某些服务器偶发连接重置,重试可恢复)
     """
     path = Path(repo) / "src-tauri" / "src" / "ssh" / "client.rs"
     if not path.exists():
@@ -748,8 +747,20 @@ def patch_ssh_algorithms(repo):
         1,
     )
 
+    # 增强连接重试: 3次→6次, 退避 300ms→500ms(应对间歇性 RST/10054)
+    new_src = re.sub(
+        r'const CONNECT_MAX_ATTEMPTS: u32 = \d+;',
+        'const CONNECT_MAX_ATTEMPTS: u32 = 6;',
+        new_src,
+    )
+    new_src = re.sub(
+        r'const CONNECT_RETRY_BACKOFF_MS: u64 = \d+;',
+        'const CONNECT_RETRY_BACKOFF_MS: u64 = 500;',
+        new_src,
+    )
+
     path.write_text(new_src, encoding="utf-8")
-    log.info("  ✅ SSH 算法自动适配(完整算法集,修复 10054 连接重置)")
+    log.info("  ✅ SSH 连接健壮性增强(完整算法集+6次重试,修复 10054)")
 
 
 def patch_keepalive(repo):
