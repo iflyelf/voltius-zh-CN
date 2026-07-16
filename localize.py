@@ -619,6 +619,100 @@ def patch_default_settings(repo):
     log.info("  ✅ 滚动小地图默认关闭")
 
 
+def patch_keepalive(repo):
+    """放宽 SSH keepalive 容忍度,修复频繁断线 (Connection failed: Disconnected)。
+
+    上游默认 balanced=每3秒探测,连续3次(9秒)无响应即断开,对抖动/代理网络过于激进。
+    改为: 默认 tolerant, 且放宽各预设的探测间隔和最大次数。
+    """
+    path = Path(repo) / "src" / "utils" / "keepalive.ts"
+    if not path.exists():
+        log.warning("  ⚠️ 未找到 keepalive.ts，跳过")
+        return
+
+    src = path.read_text(encoding="utf-8")
+
+    # 1. 默认预设改为 tolerant
+    src = re.sub(
+        r'export const DEFAULT_KEEPALIVE_PRESET: KeepalivePreset = "balanced";',
+        'export const DEFAULT_KEEPALIVE_PRESET: KeepalivePreset = "tolerant";',
+        src,
+    )
+
+    # 2. 放宽各预设的容忍度(检测时间 = intervalSecs × max)
+    #    fast: 2×2=4s → 5×3=15s ; balanced: 3×3=9s → 10×3=30s ; tolerant: 5×4=20s → 15×6=90s
+    src = re.sub(
+        r'fast: \{ intervalSecs: \d+, max: \d+,',
+        'fast: { intervalSecs: 5, max: 3,',
+        src,
+    )
+    src = re.sub(
+        r'balanced: \{ intervalSecs: \d+, max: \d+,',
+        'balanced: { intervalSecs: 10, max: 3,',
+        src,
+    )
+    src = re.sub(
+        r'tolerant: \{ intervalSecs: \d+, max: \d+,',
+        'tolerant: { intervalSecs: 15, max: 6,',
+        src,
+    )
+
+    path.write_text(src, encoding="utf-8")
+    log.info("  ✅ SSH keepalive 容忍度放宽(默认 tolerant, 90秒容忍)")
+
+    # 同步 Rust 端 connect 默认值(前端没传时的兜底)
+    ssh_cmd = Path(repo) / "src-tauri" / "src" / "commands" / "ssh.rs"
+    if ssh_cmd.exists():
+        rs = ssh_cmd.read_text(encoding="utf-8")
+        rs2 = re.sub(r'keepalive_interval_secs\.unwrap_or\(\d+\)', 'keepalive_interval_secs.unwrap_or(15)', rs)
+        rs2 = re.sub(r'keepalive_max\.unwrap_or\(\d+\)', 'keepalive_max.unwrap_or(6)', rs2)
+        if rs2 != rs:
+            ssh_cmd.write_text(rs2, encoding="utf-8")
+            log.info("  ✅ Rust 端 keepalive 默认值同步(15秒×6)")
+
+
+def patch_updater(repo, github_repo="iflyelf/voltius-zh-CN"):
+    """1) 自动更新默认关闭 2) 更新源指向自己的 GitHub 仓库 Release。"""
+    # 1. Rust 端: updater_auto_enabled 默认改为 false
+    sync_path = Path(repo) / "src-tauri" / "src" / "commands" / "sync.rs"
+    if sync_path.exists():
+        src = sync_path.read_text(encoding="utf-8")
+        # 把该函数里的两个 true 默认值改为 false
+        pattern = re.compile(
+            r'(pub fn updater_auto_enabled\(\) -> bool \{.*?\.unwrap_or\()true(\).*?Err\(_\) => )true',
+            re.DOTALL
+        )
+        new_src, n = pattern.subn(r'\1false\2false', src)
+        if n > 0:
+            sync_path.write_text(new_src, encoding="utf-8")
+            log.info("  ✅ 自动更新默认关闭")
+        else:
+            log.warning("  ⚠️ 未匹配到 updater_auto_enabled 默认值")
+    else:
+        log.warning("  ⚠️ 未找到 sync.rs")
+
+    # 2. 前端 store 默认值也改为 false
+    pref_path = Path(repo) / "src" / "stores" / "updaterPrefStore.ts"
+    if pref_path.exists():
+        src = pref_path.read_text(encoding="utf-8")
+        new_src, n = re.subn(r'autoUpdate: true,', 'autoUpdate: false,', src)
+        if n > 0:
+            pref_path.write_text(new_src, encoding="utf-8")
+            log.info("  ✅ 前端 autoUpdate 默认关闭")
+
+    # 3. tauri.conf.json: updater endpoint 指向自己的 GitHub Release
+    conf_path = Path(repo) / "src-tauri" / "tauri.conf.json"
+    if conf_path.exists():
+        conf = read_json(conf_path)
+        if "plugins" in conf and "updater" in conf["plugins"]:
+            # GitHub Release 的 latest.json 更新源
+            conf["plugins"]["updater"]["endpoints"] = [
+                f"https://github.com/{github_repo}/releases/latest/download/latest.json"
+            ]
+            write_json(conf_path, conf)
+            log.info("  ✅ 更新源指向 %s", github_repo)
+
+
 def do_patch(repo):
     log.info("🛠️ 应用源码补丁到 %s", repo)
     copy_locales_to_repo(repo)
@@ -632,6 +726,8 @@ def do_patch(repo):
     patch_default_theme(repo)      # 再设默认为 flexoki-light
     patch_builtin_themes_font(repo)  # 最后统一改字体（包括新注入的）
     patch_default_settings(repo)   # 默认设置：关闭滚动小地图
+    patch_updater(repo)            # 自动更新默认关闭 + 更新源指向自己仓库
+    patch_keepalive(repo)          # 放宽 SSH keepalive,修复频繁断线
     log.info("✅ 补丁应用完成")
 
 
