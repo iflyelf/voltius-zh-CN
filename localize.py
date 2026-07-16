@@ -435,8 +435,41 @@ def patch_plugins_i18n(repo):
     log.info("  ✅ 插件汉化: 替换 %d 条 (未匹配 %d 条)", total_replaced, total_missed)
 
 
-def patch_default_theme(repo, theme_id="tokyo-night"):
-    """将默认主题设置为指定主题 (默认 tokyo-night)。"""
+def patch_add_flexoki_theme(repo):
+    """将 Flexoki Light/Dark 主题注入到内置主题列表开头。"""
+    try:
+        from flexoki_theme import FLEXOKI_LIGHT_THEME, FLEXOKI_DARK_THEME
+    except ImportError as e:
+        log.warning("  ⚠️ 无法导入 Flexoki 主题定义: %s，跳过", e)
+        return
+
+    path = Path(repo) / "src" / "themes" / "presets.ts"
+    if not path.exists():
+        log.warning("  ⚠️ 未找到 presets.ts，跳过 Flexoki 注入")
+        return
+
+    src = path.read_text(encoding="utf-8")
+    
+    # 检查是否已注入
+    if '"flexoki-light"' in src:
+        log.info("  ⏭️ Flexoki 主题已存在，跳过")
+        return
+
+    # 在 BUILT_IN_THEMES: AppTheme[] = [ 后面注入
+    pattern = re.compile(r'(export const BUILT_IN_THEMES: AppTheme\[\] = \[\s*)')
+    replacement = r'\1' + FLEXOKI_LIGHT_THEME + FLEXOKI_DARK_THEME
+    new_src, n = pattern.subn(replacement, src)
+    
+    if n == 0:
+        log.warning("  ⚠️ 未找到 BUILT_IN_THEMES 数组，跳过")
+        return
+    
+    path.write_text(new_src, encoding="utf-8")
+    log.info("  ✅ Flexoki Light/Dark 主题已注入")
+
+
+def patch_default_theme(repo, theme_id="flexoki-light"):
+    """将默认主题设置为指定主题 (默认 flexoki-light)。"""
     path = Path(repo) / "src" / "themes" / "presets.ts"
     if not path.exists():
         log.warning("  ⚠️ 未找到 presets.ts，跳过默认主题设置")
@@ -540,8 +573,9 @@ def do_patch(repo):
     patch_unlock_vaults(repo)
     patch_force_pro(repo)
     patch_plugins_i18n(repo)
-    patch_default_theme(repo)
-    patch_builtin_themes_font(repo)
+    patch_add_flexoki_theme(repo)  # 先注入 Flexoki 主题
+    patch_default_theme(repo)      # 再设默认为 flexoki-light
+    patch_builtin_themes_font(repo)  # 最后统一改字体（包括新注入的）
     log.info("✅ 补丁应用完成")
 
 
