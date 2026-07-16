@@ -405,13 +405,16 @@ def patch_plugins_i18n(repo):
     try:
         from plugin_translations import PLUGIN_TRANSLATIONS
         from gist_translations import GIST_SYNC_TRANSLATIONS
+        from plugin_meta_translations import PLUGIN_META_TRANSLATIONS
     except ImportError as e:
         log.warning("  ⚠️ 无法导入插件翻译表: %s，跳过插件汉化", e)
         return
 
+    # 深度合并: 同一文件的映射合并而非覆盖
     all_translations = {}
-    all_translations.update(PLUGIN_TRANSLATIONS)
-    all_translations.update(GIST_SYNC_TRANSLATIONS)
+    for table in (PLUGIN_TRANSLATIONS, GIST_SYNC_TRANSLATIONS, PLUGIN_META_TRANSLATIONS):
+        for rel_path, mapping in table.items():
+            all_translations.setdefault(rel_path, {}).update(mapping)
 
     total_replaced = 0
     total_missed = 0

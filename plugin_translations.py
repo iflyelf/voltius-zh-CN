@@ -105,14 +105,14 @@ PLUGIN_TRANSLATIONS = {
 
     # ═══════════════════════════ Proxmox ═══════════════════════════
     "src/plugins/proxmox/components/ProxmoxPanel.tsx": {
-        '"No active session"': '"无活动会话"',
-        '"Proxmox VE not detected"': '"未检测到 Proxmox VE"',
-        '"This panel requires an SSH connection to a Proxmox VE host."': '"此面板需要 SSH 连接到 Proxmox VE 主机。"',
+        '>No active session<': '>无活动会话<',
+        '>Proxmox VE not detected<': '>未检测到 Proxmox VE<',
+        '          This panel requires an SSH connection to a Proxmox VE host.': '          此面板需要 SSH 连接到 Proxmox VE 主机。',
         '"Refresh"': '"刷新"',
     },
     "src/plugins/proxmox/components/LxcList.tsx": {
-        '`${running} running`': '`${running} 运行中`',
-        '"No containers"': '"无容器"',
+        '>{running} running<': '>{running} 运行中<',
+        '>No containers<': '>无容器<',
         '"Start"': '"启动"',
         '"Stop"': '"停止"',
         '"Restart"': '"重启"',
@@ -124,7 +124,7 @@ PLUGIN_TRANSLATIONS = {
         '"Snapshot name"': '"快照名称"',
         '"Create snapshot"': '"创建快照"',
         '"Description (optional)"': '"描述（可选）"',
-        '"No snapshots"': '"无快照"',
+        '>No snapshots<': '>无快照<',
         '"Rollback to this snapshot"': '"回滚到此快照"',
         '"Delete snapshot"': '"删除快照"',
         '`Snapshot failed: ${e}`': '`快照失败: ${e}`',
@@ -134,35 +134,35 @@ PLUGIN_TRANSLATIONS = {
 
     # ═══════════════════════════ Monitoring ═══════════════════════════
     "src/plugins/monitoring/components/MetricsPanel.tsx": {
-        '"No active session"': '"无活动会话"',
-        '"Live metrics for this device aren\'t available on Android. Connect to a host over SSH to see its metrics."':
-            '"此设备的实时指标在 Android 上不可用。通过 SSH 连接到主机以查看其指标。"',
-        '"Live metrics are not available for serial sessions."': '"串口会话不支持实时指标。"',
+        '>No active session<': '>无活动会话<',
+        "          Live metrics for this device aren't available on Android. Connect to a host over SSH to see its metrics.":
+            '          此设备的实时指标在 Android 上不可用。通过 SSH 连接到主机以查看其指标。',
+        '          Live metrics are not available for serial sessions.': '          串口会话不支持实时指标。',
     },
     "src/plugins/monitoring/components/SystemInfoSection.tsx": {
-        '"System Info"': '"系统信息"',
-        '"Loading…"': '"加载中…"',
-        '"Cores"': '"核心"',
-        '"Arch"': '"架构"',
-        '"Host"': '"主机"',
-        '"Kernel"': '"内核"',
+        '            System Info': '            系统信息',
+        '>Loading…<': '>加载中…<',
+        'label="Cores"': 'label="核心"',
+        'label="Arch"': 'label="架构"',
+        'label="Host"': 'label="主机"',
+        'label="Kernel"': 'label="内核"',
     },
     "src/plugins/monitoring/components/DiskSection.tsx": {
-        '"Disk"': '"磁盘"',
+        '        Disk': '        磁盘',
     },
 
     # ═══════════════════════════ Process Manager ═══════════════════════════
     "src/plugins/process-manager/components/ProcessPanel.tsx": {
-        '"No active session"': '"无活动会话"',
-        '"The process list for this device isn\'t available on Android. Connect to a host over SSH to see its processes."':
-            '"此设备的进程列表在 Android 上不可用。通过 SSH 连接到主机以查看其进程。"',
-        '"Filter processes…"': '"过滤进程…"',
-        '"Name"': '"名称"',
-        '"User"': '"用户"',
-        '"Mem"': '"内存"',
-        '"Kill"': '"终止"',
-        '"Cancel"': '"取消"',
+        '>No active session<': '>无活动会话<',
+        "          The process list for this device isn't available on Android. Connect to a host over SSH to see its processes.":
+            '          此设备的进程列表在 Android 上不可用。通过 SSH 连接到主机以查看其进程。',
+        'placeholder="Filter processes…"': 'placeholder="过滤进程…"',
+        'label="Name"': 'label="名称"',
+        'label="User"': 'label="用户"',
+        'label="Mem"': 'label="内存"',
+        '              Kill\n': '              终止\n',
+        '              Cancel\n': '              取消\n',
         '`Kill process ${entry.pid}`': '`终止进程 ${entry.pid}`',
-        '"No processes found"': '"未找到进程"',
+        '>No processes found<': '>未找到进程<',
     },
 }
