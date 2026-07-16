@@ -1,5 +1,6 @@
 # voltius 项目排除项
-voltius
+# 用 /voltius/ 锚定到本目录的子目录(上游克隆),避免匹配项目根导致 VSCode 隐藏
+/voltius/
 *.pyc
 __pycache__/
 .DS_Store
