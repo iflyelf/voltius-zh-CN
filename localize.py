@@ -620,7 +620,51 @@ def patch_default_settings(repo):
 
 
 def patch_terminal_bold(repo):
-    """终端粗体文字更明亮圆润: 亮色粗体 + 加重字重 + 高对比度。"""
+    """终端粗体文字更明亮圆润: JetBrains Mono 字体 + 亮色粗体 + 加重字重 + 高对比度。"""
+    # 1. 复制 JetBrains Mono 字体文件到 public/fonts/
+    fonts_src_dir = Path(__file__).parent / "fonts"
+    fonts_dst_dir = Path(repo) / "public" / "fonts"
+    if fonts_src_dir.exists():
+        for font_file in fonts_src_dir.glob("jetbrains-mono-*.woff2"):
+            dst = fonts_dst_dir / font_file.name
+            if not dst.exists():
+                shutil.copy2(font_file, dst)
+                log.info(f"  📦 复制字体: {font_file.name}")
+    
+    # 2. 注入 @font-face 到 globals.css
+    css_path = Path(repo) / "src" / "styles" / "globals.css"
+    if css_path.exists():
+        css = css_path.read_text(encoding="utf-8")
+        # 检测 @font-face 里是否已有 JetBrains Mono(而非 --font-mono 变量里的引用)
+        if "font-family: 'JetBrains Mono'" not in css:
+            # 在 Inter Variable 的 @font-face 后追加 JetBrains Mono 定义
+            pattern = re.compile(
+                r"(  @font-face \{\s+font-family: 'Inter Variable';.*?\s+\}\s+)(\})",
+                re.DOTALL
+            )
+            jetbrains_faces = """  @font-face {
+    font-family: 'JetBrains Mono';
+    font-style: normal;
+    font-display: block;
+    font-weight: 400;
+    src: url('/fonts/jetbrains-mono-latin-400-normal.woff2') format('woff2');
+  }
+  @font-face {
+    font-family: 'JetBrains Mono';
+    font-style: normal;
+    font-display: block;
+    font-weight: 700;
+    src: url('/fonts/jetbrains-mono-latin-700-normal.woff2') format('woff2');
+  }
+}"""
+            css, n = pattern.subn(r'\1' + jetbrains_faces, css)
+            if n > 0:
+                css_path.write_text(css, encoding="utf-8")
+                log.info("  ✅ 注入 JetBrains Mono @font-face")
+            else:
+                log.warning("  ⚠️ globals.css @font-face 匹配失败")
+    
+    # 3. useTerminal.ts 配置优化
     path = Path(repo) / "src" / "hooks" / "useTerminal.ts"
     if not path.exists():
         log.warning("  ⚠️ 未找到 useTerminal.ts，跳过终端粗体优化")
@@ -629,7 +673,7 @@ def patch_terminal_bold(repo):
     src = path.read_text(encoding="utf-8")
 
     if "drawBoldTextInBrightColors" in src:
-        log.info("  ⏭️ 终端粗体已优化，跳过")
+        log.info("  ⏭️ 终端粗体配置已优化，跳过")
         return
 
     # 在 allowProposedApi: true, 后追加粗体/对比度配置
@@ -657,6 +701,7 @@ def patch_terminal_bold(repo):
 
     path.write_text(src, encoding="utf-8")
     log.info("  ✅ 终端粗体优化(亮色粗体+加重字重+高对比度)")
+
 
 
 def patch_keepalive(repo):
