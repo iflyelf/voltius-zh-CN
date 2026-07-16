@@ -397,6 +397,44 @@ def patch_force_pro(repo):
     log.info("  ✅ 已强制客户端订阅状态为 Pro")
 
 
+def patch_plugins_i18n(repo):
+    """汉化 plugins 目录 (docker/proxmox/monitoring/process-manager/gist-sync)。
+
+    这些插件未接入 i18next,全是硬编码英文,通过精确字符串替换汉化。
+    """
+    try:
+        from plugin_translations import PLUGIN_TRANSLATIONS
+        from gist_translations import GIST_SYNC_TRANSLATIONS
+    except ImportError as e:
+        log.warning("  ⚠️ 无法导入插件翻译表: %s，跳过插件汉化", e)
+        return
+
+    all_translations = {}
+    all_translations.update(PLUGIN_TRANSLATIONS)
+    all_translations.update(GIST_SYNC_TRANSLATIONS)
+
+    total_replaced = 0
+    total_missed = 0
+    for rel_path, mapping in all_translations.items():
+        fpath = Path(repo) / rel_path
+        if not fpath.exists():
+            log.warning("  ⚠️ 插件文件不存在: %s", rel_path)
+            continue
+
+        src = fpath.read_text(encoding="utf-8")
+        replaced = 0
+        for orig, zh in mapping.items():
+            if orig in src:
+                src = src.replace(orig, zh)
+                replaced += 1
+            else:
+                total_missed += 1
+        fpath.write_text(src, encoding="utf-8")
+        total_replaced += replaced
+
+    log.info("  ✅ 插件汉化: 替换 %d 条 (未匹配 %d 条)", total_replaced, total_missed)
+
+
 def do_patch(repo):
     log.info("🛠️ 应用源码补丁到 %s", repo)
     copy_locales_to_repo(repo)
@@ -405,6 +443,7 @@ def do_patch(repo):
     patch_tauri_pubkey(repo)
     patch_unlock_vaults(repo)
     patch_force_pro(repo)
+    patch_plugins_i18n(repo)
     log.info("✅ 补丁应用完成")
 
 
