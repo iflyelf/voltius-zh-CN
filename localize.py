@@ -619,6 +619,46 @@ def patch_default_settings(repo):
     log.info("  ✅ 滚动小地图默认关闭")
 
 
+def patch_terminal_bold(repo):
+    """终端粗体文字更明亮圆润: 亮色粗体 + 加重字重 + 高对比度。"""
+    path = Path(repo) / "src" / "hooks" / "useTerminal.ts"
+    if not path.exists():
+        log.warning("  ⚠️ 未找到 useTerminal.ts，跳过终端粗体优化")
+        return
+
+    src = path.read_text(encoding="utf-8")
+
+    if "drawBoldTextInBrightColors" in src:
+        log.info("  ⏭️ 终端粗体已优化，跳过")
+        return
+
+    # 在 allowProposedApi: true, 后追加粗体/对比度配置
+    pattern = re.compile(
+        r'(fontFamily: activeTheme\.terminalFontFamily,\n)(\s+)(scrollback,)'
+    )
+    replacement = (
+        r'\1\2fontWeight: "normal",\n'
+        r'\2fontWeightBold: "bold",\n'
+        r'\2\3'
+    )
+    src, n1 = pattern.subn(replacement, src)
+
+    pattern2 = re.compile(r'(allowProposedApi: true,\n)(\s+)(\}\);)')
+    replacement2 = (
+        r'\1\2drawBoldTextInBrightColors: true,\n'
+        r'\2minimumContrastRatio: 7,\n'
+        r'\2\3'
+    )
+    src, n2 = pattern2.subn(replacement2, src)
+
+    if n1 == 0 or n2 == 0:
+        log.warning("  ⚠️ 终端配置匹配失败 (n1=%d n2=%d)", n1, n2)
+        return
+
+    path.write_text(src, encoding="utf-8")
+    log.info("  ✅ 终端粗体优化(亮色粗体+加重字重+高对比度)")
+
+
 def patch_keepalive(repo):
     """放宽 SSH keepalive 容忍度,修复频繁断线 (Connection failed: Disconnected)。
 
@@ -728,6 +768,7 @@ def do_patch(repo):
     patch_default_settings(repo)   # 默认设置：关闭滚动小地图
     patch_updater(repo)            # 自动更新默认关闭 + 更新源指向自己仓库
     patch_keepalive(repo)          # 放宽 SSH keepalive,修复频繁断线
+    patch_terminal_bold(repo)      # 终端粗体优化(亮色+加重+高对比度)
     log.info("✅ 补丁应用完成")
 
 

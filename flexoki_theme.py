@@ -10,7 +10,7 @@ FLEXOKI_LIGHT_THEME = '''  {
     builtIn: true,
     uiFontFamily: "'Inter Variable', system-ui, sans-serif",
     uiFontSize: 16,
-    terminalFontFamily: "'Source Code Pro', monospace",
+    terminalFontFamily: "'JetBrains Mono', monospace",
     terminalFontSize: 16,
     ui: {
       bgTerminal: "#FFFCF0",
@@ -66,7 +66,7 @@ FLEXOKI_DARK_THEME = '''  {
     builtIn: true,
     uiFontFamily: "'Inter Variable', system-ui, sans-serif",
     uiFontSize: 16,
-    terminalFontFamily: "'Source Code Pro', monospace",
+    terminalFontFamily: "'JetBrains Mono', monospace",
     terminalFontSize: 16,
     ui: {
       bgTerminal: "#100F0F",
