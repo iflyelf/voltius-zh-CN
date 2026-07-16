@@ -435,6 +435,26 @@ def patch_plugins_i18n(repo):
     log.info("  ✅ 插件汉化: 替换 %d 条 (未匹配 %d 条)", total_replaced, total_missed)
 
 
+def patch_default_theme(repo, theme_id="tokyo-night"):
+    """将默认主题设置为指定主题 (默认 tokyo-night)。"""
+    path = Path(repo) / "src" / "themes" / "presets.ts"
+    if not path.exists():
+        log.warning("  ⚠️ 未找到 presets.ts，跳过默认主题设置")
+        return
+
+    src = path.read_text(encoding="utf-8")
+
+    pattern = re.compile(r'export const DEFAULT_THEME_ID = "[^"]*";')
+    new_src, n = pattern.subn(
+        f'export const DEFAULT_THEME_ID = "{theme_id}";', src
+    )
+    if n == 0:
+        log.warning("  ⚠️ 未匹配到 DEFAULT_THEME_ID，跳过")
+        return
+    path.write_text(new_src, encoding="utf-8")
+    log.info("  ✅ 默认主题设为: %s", theme_id)
+
+
 def do_patch(repo):
     log.info("🛠️ 应用源码补丁到 %s", repo)
     copy_locales_to_repo(repo)
@@ -444,6 +464,7 @@ def do_patch(repo):
     patch_unlock_vaults(repo)
     patch_force_pro(repo)
     patch_plugins_i18n(repo)
+    patch_default_theme(repo)
     log.info("✅ 补丁应用完成")
 
 
