@@ -704,6 +704,54 @@ def patch_terminal_bold(repo):
 
 
 
+def patch_ssh_algorithms(repo):
+    """SSH 算法自动适配: 默认启用完整算法集(安全优先+旧算法后备)。
+
+    修复"命令行 ssh 能连,Voltius 报 10054/连接重置"的问题。
+    russh 默认算法集较窄,老服务器(旧 kex/cipher/mac)会握手失败被 RST。
+    legacy_preferred() 把旧算法追加在安全算法之后,保持安全优先排序,
+    等价于命令行 OpenSSH 的宽松兼容行为,无需用户手动开关。
+    """
+    path = Path(repo) / "src-tauri" / "src" / "ssh" / "client.rs"
+    if not path.exists():
+        log.warning("  ⚠️ 未找到 client.rs，跳过 SSH 算法适配")
+        return
+
+    src = path.read_text(encoding="utf-8")
+
+    if "// 汉化版: 默认完整算法集" in src:
+        log.info("  ⏭️ SSH 算法已适配，跳过")
+        return
+
+    # 把 config 的 preferred 改为始终用 legacy_preferred()(完整算法集)
+    pattern = re.compile(
+        r'preferred: if legacy_algorithms \{\s*'
+        r'legacy_preferred\(\)\s*'
+        r'\} else \{\s*'
+        r'Default::default\(\)\s*'
+        r'\},'
+    )
+    replacement = (
+        '// 汉化版: 默认完整算法集(安全优先+旧算法后备),自动适配老服务器\n'
+        '        preferred: legacy_preferred(),'
+    )
+    new_src, n = pattern.subn(replacement, src)
+
+    if n == 0:
+        log.warning("  ⚠️ 未匹配到 preferred 算法配置，跳过")
+        return
+
+    # legacy_algorithms 参数不再使用,加 _ 前缀避免未使用警告(Rust warning as error)
+    new_src = new_src.replace(
+        "    legacy_algorithms: bool,",
+        "    _legacy_algorithms: bool, // 汉化版已默认完整算法集,此参数保留兼容",
+        1,
+    )
+
+    path.write_text(new_src, encoding="utf-8")
+    log.info("  ✅ SSH 算法自动适配(完整算法集,修复 10054 连接重置)")
+
+
 def patch_keepalive(repo):
     """放宽 SSH keepalive 容忍度,修复频繁断线 (Connection failed: Disconnected)。
 
@@ -812,6 +860,7 @@ def do_patch(repo):
     patch_builtin_themes_font(repo)  # 最后统一改字体（包括新注入的）
     patch_default_settings(repo)   # 默认设置：关闭滚动小地图
     patch_updater(repo)            # 自动更新默认关闭 + 更新源指向自己仓库
+    patch_ssh_algorithms(repo)     # SSH 算法自动适配(修复 10054 连接重置)
     patch_keepalive(repo)          # 放宽 SSH keepalive,修复频繁断线
     patch_terminal_bold(repo)      # 终端粗体优化(亮色+加重+高对比度)
     log.info("✅ 补丁应用完成")
