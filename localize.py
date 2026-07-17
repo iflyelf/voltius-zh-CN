@@ -852,6 +852,69 @@ def patch_hosts_display(repo):
     log.info("  ✅ 主机列表显示修复(库根节点显示所有主机)")
 
 
+def patch_folder_counts(repo):
+    """修复文件夹计数: 递归统计所有后代连接(支持多层目录)。
+
+    上游逻辑: 只统计直接子连接, 多层目录父文件夹显示 0。
+    修复: 自底向上累加到所有祖先文件夹, 父文件夹显示含所有后代的总数。
+    """
+    path = Path(repo) / "src" / "components" / "hosts" / "HostsPage.tsx"
+    if not path.exists():
+        log.warning("  ⚠️ 未找到 HostsPage.tsx，跳过文件夹计数修复")
+        return
+
+    src = path.read_text(encoding="utf-8")
+
+    if "含所有后代子文件夹里的连接" in src:
+        log.info("  ⏭️ 文件夹计数已递归修复，跳过")
+        return
+
+    # 替换 folderCounts 逻辑为递归版本
+    old_pattern = re.compile(
+        r'// Per-folder item counts\s*\n'
+        r'\s*const folderCounts = useMemo\(\(\) => \{\s*\n'
+        r'\s*const counts: Record<string, number> = \{\};\s*\n'
+        r'\s*for \(const c of connections\) \{\s*\n'
+        r'\s*if \(c\.folder_id\) counts\[c\.folder_id\] = \(counts\[c\.folder_id\] \?\? 0\) \+ 1;\s*\n'
+        r'\s*\}\s*\n'
+        r'\s*return counts;\s*\n'
+        r'\s*\}, \[connections\]\);',
+        re.MULTILINE
+    )
+    new_code = '''  // Per-folder item counts (含所有后代子文件夹里的连接,支持多层目录)
+  const folderCounts = useMemo(() => {
+    // 1. 直接连接数
+    const direct: Record<string, number> = {};
+    for (const c of connections) {
+      if (c.folder_id) direct[c.folder_id] = (direct[c.folder_id] ?? 0) + 1;
+    }
+    // 2. 自底向上累加到所有祖先文件夹
+    const parentOf: Record<string, string | undefined> = {};
+    for (const f of folders) parentOf[f.id] = f.parent_folder_id ?? undefined;
+    const counts: Record<string, number> = {};
+    for (const f of folders) counts[f.id] = 0;
+    for (const [fid, n] of Object.entries(direct)) {
+      let cur: string | undefined = fid;
+      const seen = new Set<string>();
+      while (cur && !seen.has(cur)) {
+        seen.add(cur);
+        counts[cur] = (counts[cur] ?? 0) + n;
+        cur = parentOf[cur];
+      }
+    }
+    return counts;
+  }, [connections, folders]);'''
+
+    new_src, n = old_pattern.subn(new_code, src)
+
+    if n == 0:
+        log.warning("  ⚠️ 未匹配到 folderCounts 逻辑，跳过")
+        return
+
+    path.write_text(new_src, encoding="utf-8")
+    log.info("  ✅ 文件夹计数递归修复(父文件夹含所有后代连接)")
+
+
 def patch_default_settings(repo):
     """修改默认设置：关闭滚动小地图。"""
     path = Path(repo) / "src" / "stores" / "toggleSettingsStore.ts"
@@ -1131,6 +1194,7 @@ def do_patch(repo):
     patch_omni_commands(repo)      # 搜索框命令汉化(New Host→新建主机 等)
     patch_remaining_ui_text(repo)  # 批量翻译剩余硬编码英文(导入导出菜单/同步设置等)
     patch_hosts_display(repo)      # 修复主机列表显示(库根节点显示所有主机)
+    patch_folder_counts(repo)      # 修复文件夹计数(递归统计后代连接,多层目录)
     patch_default_settings(repo)   # 默认设置：关闭滚动小地图
     patch_updater(repo)            # 自动更新默认关闭 + 更新源指向自己仓库
     patch_ssh_algorithms(repo)     # SSH 算法自动适配(修复 10054 连接重置)
