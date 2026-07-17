@@ -1,7 +1,8 @@
 import i18n from "@/i18n";
-import type { ConnectionExport } from "../formats";
+import type { ConnectionExport, FolderExport } from "../formats";
 
-// 新格式: Groups,Label,Tags,Hostname/IP,Protocol,Port,Username,Password
+// 导出格式: Groups,Label,Tags,Hostname/IP,Protocol,Port,Username,Password
+// 导入兼容: 上述格式 + 含 Notes 列的变体 + 旧格式(name/host/port/username)
 const CSV_HEADERS_NEW = ["Groups", "Label", "Tags", "Hostname/IP", "Protocol", "Port", "Username", "Password"];
 
 function csvEscape(v: string): string {
@@ -11,14 +12,42 @@ function csvEscape(v: string): string {
   return v;
 }
 
-export function connectionsToCSV(connections: ConnectionExport[]): string {
+// 根据文件夹层级重建完整路径(如 测试/测试1/测试2)
+function buildFolderPathMap(folders: FolderExport[]): Map<string, string> {
+  const byEid = new Map(folders.map((f) => [f._eid, f]));
+  const pathCache = new Map<string, string>();
+  const resolve = (eid: string): string => {
+    if (pathCache.has(eid)) return pathCache.get(eid)!;
+    const f = byEid.get(eid);
+    if (!f) return "";
+    const path = f.parent_folder_eid
+      ? `${resolve(f.parent_folder_eid)}/${f.name}`
+      : f.name;
+    pathCache.set(eid, path);
+    return path;
+  };
+  const map = new Map<string, string>();
+  for (const f of folders) map.set(f._eid, resolve(f._eid));
+  return map;
+}
+
+export function connectionsToCSV(connections: ConnectionExport[], folders: FolderExport[] = []): string {
+  const folderPathMap = buildFolderPathMap(folders);
   const rows: string[][] = [CSV_HEADERS_NEW];
   for (const c of connections) {
-    // 从 tags 中提取 __group:xxx__ 特殊标签作为 Groups
-    const groupTag = c.tags.find((t) => t.startsWith("__group:") && t.endsWith("__"));
-    const groups = groupTag ? groupTag.slice(8, -2) : "";
-    const regularTags = c.tags.filter((t) => !(t.startsWith("__group:") && t.endsWith("__")));
-    
+    // Groups 来源优先级: 文件夹层级路径 > __group:xxx__ 特殊标签
+    let groups = "";
+    if (c._folder_eid && folderPathMap.has(c._folder_eid)) {
+      groups = folderPathMap.get(c._folder_eid)!;
+    } else {
+      const groupTag = c.tags.find((t) => t.startsWith("__group:") && t.endsWith("__"));
+      if (groupTag) groups = groupTag.slice(8, -2);
+    }
+    const regularTags = c.tags.filter((t) =>
+      !(t.startsWith("__group:") && t.endsWith("__")) &&
+      !(t.startsWith("__note:") && t.endsWith("__"))
+    );
+
     rows.push([
       groups,                           // Groups
       c.name ?? "",                     // Label
@@ -64,16 +93,17 @@ export function connectionsFromCSV(text: string): ConnectionExport[] {
   const headers = parseCSVRow(lines[0]).map((h) => h.toLowerCase().trim());
   const col = (name: string) => headers.indexOf(name);
 
-  // 支持多种列名映射
-  const hostIdx = col("hostname/ip") >= 0 ? col("hostname/ip") : 
+  // 灵活列名映射(支持多种字段变体, 含/不含 Notes)
+  const hostIdx = col("hostname/ip") >= 0 ? col("hostname/ip") :
                   col("hostname") >= 0 ? col("hostname") : col("host");
   const usernameIdx = col("username") >= 0 ? col("username") : col("user");
   const nameIdx = col("label") >= 0 ? col("label") : col("name");
   const groupsIdx = col("groups") >= 0 ? col("groups") : col("group");
   const tagsIdx = col("tags");
+  const notesIdx = col("notes") >= 0 ? col("notes") : col("note");
   const portIdx = col("port");
   const passwordIdx = col("password");
-  
+
   if (hostIdx === -1 || usernameIdx === -1) {
     throw new Error(i18n.t("common.error.csvMissingColumns"));
   }
@@ -95,7 +125,12 @@ export function connectionsFromCSV(text: string): ConnectionExport[] {
       tags.push(`__group:${row[groupsIdx].trim()}__`);
     }
 
-    connections.push({
+    // Notes 列(如有)存为特殊 tag __note:xxx__(ConnectionFormData 无 notes 字段)
+    if (notesIdx >= 0 && row[notesIdx]?.trim()) {
+      tags.push(`__note:${row[notesIdx].trim()}__`);
+    }
+
+    const conn: ConnectionExport = {
       name: nameIdx >= 0 ? row[nameIdx]?.trim() || undefined : undefined,
       host,
       port: portIdx >= 0 ? parseInt(row[portIdx], 10) || 22 : 22,
@@ -103,7 +138,8 @@ export function connectionsFromCSV(text: string): ConnectionExport[] {
       password: passwordIdx >= 0 ? row[passwordIdx]?.trim() || undefined : undefined,
       auth_type: "password", // CSV 导入默认密码认证
       tags,
-    });
+    };
+    connections.push(conn);
   }
   return connections;
 }
