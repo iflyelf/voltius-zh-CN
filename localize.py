@@ -646,13 +646,26 @@ def patch_csv_groups_to_folders(repo):
         return
     
     current = importers_path.read_text(encoding="utf-8")
-    if "汉化版: 从 __group:xxx__ 特殊 tag 提取分组" in current:
+    if "汉化版: 从 __group:xxx__ 特殊 tag 提取分组" not in current:
+        # 直接复制完整文件
+        shutil.copy2(importers_src, importers_path)
+        log.info("  ✅ CSV Groups 自动映射为文件夹(支持多层目录)")
+    else:
         log.info("  ⏭️ Groups 文件夹映射已启用，跳过")
-        return
-    
-    # 直接复制完整文件
-    shutil.copy2(importers_src, importers_path)
-    log.info("  ✅ CSV Groups 自动映射为文件夹")
+
+    # 导出侧: ExportTab 传入 bundle.folders 以重建完整路径
+    export_tab = Path(repo) / "src" / "components" / "import-export" / "ExportTab.tsx"
+    if export_tab.exists():
+        etext = export_tab.read_text(encoding="utf-8")
+        if "connectionsToCSV(bundle.connections, bundle.folders)" not in etext:
+            etext2 = etext.replace(
+                "connectionsToCSV(bundle.connections)",
+                "connectionsToCSV(bundle.connections, bundle.folders)",
+                1,
+            )
+            if etext2 != etext:
+                export_tab.write_text(etext2, encoding="utf-8")
+                log.info("  ✅ 导出 CSV 传入文件夹层级(重建 Groups 路径)")
 
 
 def patch_hosts_display(repo):
