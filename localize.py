@@ -595,6 +595,45 @@ def patch_builtin_themes_font(repo, default_size=16):
         log.warning("  ⚠️ 未找到主题加载逻辑，跳过")
 
 
+def patch_hosts_display(repo):
+    """修复主机列表显示: 库根节点显示所有主机(含文件夹内的)。
+
+    上游逻辑: 库根节点只显示未分类主机, 在文件夹里的被隐藏。
+    导致"侧边栏有数字, 主区域空白"(主机都在文件夹里时)。
+    修复: 库根节点显示全部主机, 更直观。
+    """
+    path = Path(repo) / "src" / "components" / "hosts" / "HostsPage.tsx"
+    if not path.exists():
+        log.warning("  ⚠️ 未找到 HostsPage.tsx，跳过主机显示修复")
+        return
+
+    src = path.read_text(encoding="utf-8")
+
+    if "库根节点(无 activeFolderId)" in src:
+        log.info("  ⏭️ 主机显示已修复，跳过")
+        return
+
+    # 把顶层过滤的"只显示未分类"改为"显示全部"
+    pattern = re.compile(
+        r'if \(activeFolderId\) return c\.folder_id === activeFolderId;\s*'
+        r'// Top level:.*?\n\s*'
+        r'return scopedFolders\.length === 0 \|\| !c\.folder_id \|\| !scopedFolderIds\.has\(c\.folder_id\);'
+    )
+    replacement = (
+        'if (activeFolderId) return c.folder_id === activeFolderId;\n'
+        '        // 库根节点(无 activeFolderId): 显示所有主机(包括文件夹里的),更直观\n'
+        '        return true;'
+    )
+    new_src, n = pattern.subn(replacement, src)
+
+    if n == 0:
+        log.warning("  ⚠️ 未匹配到主机过滤逻辑，跳过")
+        return
+
+    path.write_text(new_src, encoding="utf-8")
+    log.info("  ✅ 主机列表显示修复(库根节点显示所有主机)")
+
+
 def patch_default_settings(repo):
     """修改默认设置：关闭滚动小地图。"""
     path = Path(repo) / "src" / "stores" / "toggleSettingsStore.ts"
@@ -869,6 +908,7 @@ def do_patch(repo):
     patch_add_flexoki_theme(repo)  # 先注入 Flexoki 主题
     patch_default_theme(repo)      # 再设默认为 flexoki-light
     patch_builtin_themes_font(repo)  # 最后统一改字体（包括新注入的）
+    patch_hosts_display(repo)      # 修复主机列表显示(库根节点显示所有主机)
     patch_default_settings(repo)   # 默认设置：关闭滚动小地图
     patch_updater(repo)            # 自动更新默认关闭 + 更新源指向自己仓库
     patch_ssh_algorithms(repo)     # SSH 算法自动适配(修复 10054 连接重置)
