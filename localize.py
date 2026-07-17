@@ -595,6 +595,39 @@ def patch_builtin_themes_font(repo, default_size=16):
         log.warning("  ⚠️ 未找到主题加载逻辑，跳过")
 
 
+def patch_csv_format(repo):
+    """CSV 导入导出格式增强: 支持 Groups/Label/Password 列。
+
+    新格式: Groups,Label,Tags,Hostname/IP,Protocol,Port,Username,Password
+    - Groups: 分组(如 me/Papa), 存为特殊 tag __group:xxx__
+    - Label: 主机名称
+    - Password: 明文密码(导入导出都支持)
+    - Tags: 普通标签(分号分隔)
+    
+    向后兼容旧格式(name/host/port/username)。
+    """
+    csv_path = Path(repo) / "src" / "services" / "import-export" / "parsers" / "csv.ts"
+    csv_src = Path(__file__).parent / "patches" / "csv.ts"
+    
+    if not csv_src.exists():
+        log.warning("  ⚠️ 未找到 patches/csv.ts 源文件，跳过 CSV 格式增强")
+        return
+    
+    if not csv_path.exists():
+        log.warning("  ⚠️ 未找到目标 csv.ts，跳过 CSV 格式增强")
+        return
+    
+    # 检查是否已经是新格式(避免重复覆盖)
+    current = csv_path.read_text(encoding="utf-8")
+    if "CSV_HEADERS_NEW" in current and "Groups,Label" in current:
+        log.info("  ⏭️ CSV 格式已增强，跳过")
+        return
+    
+    # 直接复制完整文件
+    shutil.copy2(csv_src, csv_path)
+    log.info("  ✅ CSV 格式增强(支持 Groups/Label/Password)")
+
+
 def patch_hosts_display(repo):
     """修复主机列表显示: 库根节点显示所有主机(含文件夹内的)。
 
@@ -908,6 +941,7 @@ def do_patch(repo):
     patch_add_flexoki_theme(repo)  # 先注入 Flexoki 主题
     patch_default_theme(repo)      # 再设默认为 flexoki-light
     patch_builtin_themes_font(repo)  # 最后统一改字体（包括新注入的）
+    patch_csv_format(repo)         # CSV 格式增强(Groups/Label/Password)
     patch_hosts_display(repo)      # 修复主机列表显示(库根节点显示所有主机)
     patch_default_settings(repo)   # 默认设置：关闭滚动小地图
     patch_updater(repo)            # 自动更新默认关闭 + 更新源指向自己仓库
