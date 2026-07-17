@@ -669,6 +669,47 @@ def patch_csv_groups_to_folders(repo):
                 log.info("  ✅ 导出 CSV 传入文件夹层级(重建 Groups 路径)")
 
 
+def patch_omni_commands(repo):
+    """搜索框(Omni Search)命令汉化: core.commands.ts 硬编码英文 label。
+
+    将 New Host/New SSH Key/Settings 等核心命令 label 翻译为中文。
+    """
+    path = Path(repo) / "src" / "commands" / "core.commands.ts"
+    if not path.exists():
+        log.warning("  ⚠️ 未找到 core.commands.ts，跳过搜索框命令汉化")
+        return
+
+    src = path.read_text(encoding="utf-8")
+
+    if "新建主机" in src or "新建 SSH 密钥" in src:
+        log.info("  ⏭️ 搜索框命令已汉化，跳过")
+        return
+
+    # 批量替换核心命令 label
+    replacements = [
+        ('label: "New Host"', 'label: "新建主机"'),
+        ('label: "New SSH Key"', 'label: "新建 SSH 密钥"'),
+        ('label: "New Identity"', 'label: "新建身份"'),
+        ('label: "Settings"', 'label: "设置"'),
+        ('label: "Check for Update"', 'label: "检查更新"'),
+        ('label: "What\'s New"', 'label: "更新日志"'),
+        ('label: "Port Forwarding"', 'label: "端口转发"'),
+        ('label: "Known Hosts"', 'label: "已知主机"'),
+        ('label: "Logs"', 'label: "日志"'),
+        ('label: "New Snippet"', 'label: "新建代码片段"'),
+        ('label: "Team Members"', 'label: "团队成员"'),
+        ('label: "Disconnect All"', 'label: "断开所有连接"'),
+    ]
+
+    new_src = src
+    for old, new in replacements:
+        new_src = new_src.replace(old, new)
+
+    if new_src != src:
+        path.write_text(new_src, encoding="utf-8")
+        log.info("  ✅ 搜索框命令汉化(New Host→新建主机 等)")
+
+
 def patch_hosts_display(repo):
     """修复主机列表显示: 库根节点显示所有主机(含文件夹内的)。
 
@@ -984,6 +1025,7 @@ def do_patch(repo):
     patch_builtin_themes_font(repo)  # 最后统一改字体（包括新注入的）
     patch_csv_format(repo)         # CSV 格式增强(Groups/Label/Password)
     patch_csv_groups_to_folders(repo) # CSV Groups 自动映射为文件夹
+    patch_omni_commands(repo)      # 搜索框命令汉化(New Host→新建主机 等)
     patch_hosts_display(repo)      # 修复主机列表显示(库根节点显示所有主机)
     patch_default_settings(repo)   # 默认设置：关闭滚动小地图
     patch_updater(repo)            # 自动更新默认关闭 + 更新源指向自己仓库
