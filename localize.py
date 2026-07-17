@@ -697,6 +697,21 @@ def patch_remaining_ui_text(repo):
             ('label: "Port Forwarding"', 'label: "端口转发"'),
             ('sub: "Saved tunnel rules"', 'sub: "已保存的隧道规则"'),
         ],
+        "src/services/import-export/handlers/connections.ts": [
+            ('label: "Connections"', 'label: "连接"'),
+        ],
+        "src/services/import-export/handlers/identities.ts": [
+            ('label: "Identities"', 'label: "身份"'),
+        ],
+        "src/services/import-export/handlers/keys.ts": [
+            ('label: "SSH Keys"', 'label: "SSH 密钥"'),
+        ],
+        "src/services/import-export/handlers/portForwarding.ts": [
+            ('label: "Port Forwarding"', 'label: "端口转发"'),
+        ],
+        "src/services/import-export/handlers/snippets.ts": [
+            ('label: "Snippets"', 'label: "代码片段"'),
+        ],
         "src/components/settings/sections/RolesSection.tsx": [
             ('label: "View secrets"', 'label: "查看密文"'),
             ('description: "See passwords and private keys in plain text"', 'description: "以明文查看密码和私钥"'),
