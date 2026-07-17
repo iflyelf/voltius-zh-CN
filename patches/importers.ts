@@ -19,30 +19,48 @@ export interface Importer {
 }
 
 function connectionsOnlyBundle(connections: ConnectionExport[]): ExportBundle {
-  // 汉化版: 从 __group:xxx__ 特殊 tag 提取分组,生成文件夹并关联连接
-  const groupMap = new Map<string, string>(); // group path → folder _eid
+  // 汉化版: 从 __group:xxx__ 特殊 tag 提取分组,支持多层目录(如 测试/测试1/测试2)
+  const pathMap = new Map<string, string>(); // full path → folder _eid
   const folders: FolderExport[] = [];
-  
+
+  // 辅助函数: 确保路径的所有层级文件夹都存在,返回最深层 _eid
+  const ensureFolderPath = (fullPath: string): string => {
+    const parts = fullPath.split("/").map((p) => p.trim()).filter(Boolean);
+    let currentPath = "";
+    let parentEid: string | undefined;
+
+    for (let i = 0; i < parts.length; i++) {
+      currentPath = i === 0 ? parts[i] : `${currentPath}/${parts[i]}`;
+
+      if (!pathMap.has(currentPath)) {
+        const eid = `folder:${currentPath}`;
+        pathMap.set(currentPath, eid);
+        folders.push({
+          _eid: eid,
+          name: parts[i], // 当前层级名称(不含父路径)
+          object_type: "connection",
+          parent_folder_eid: parentEid,
+        });
+      }
+
+      parentEid = pathMap.get(currentPath);
+    }
+
+    return parentEid ?? "";
+  };
+
   for (const conn of connections) {
     const groupTag = conn.tags.find((t) => t.startsWith("__group:") && t.endsWith("__"));
     if (groupTag) {
-      const groupPath = groupTag.slice(8, -2); // 提取 "me/Papa"
-      if (!groupMap.has(groupPath)) {
-        const eid = `folder:${groupPath}`;
-        groupMap.set(groupPath, eid);
-        folders.push({
-          _eid: eid,
-          name: groupPath, // 简化: 全路径作为名称(如 "me/Papa")
-          object_type: "connection",
-        });
+      const groupPath = groupTag.slice(8, -2).trim(); // 提取 "测试/测试1/测试2"
+      if (groupPath) {
+        conn._folder_eid = ensureFolderPath(groupPath);
       }
-      // 关联连接到文件夹
-      conn._folder_eid = groupMap.get(groupPath);
       // 移除特殊 tag (已转为文件夹)
       conn.tags = conn.tags.filter((t) => t !== groupTag);
     }
   }
-  
+
   return { version: 1, exported_at: "", folders, connections, identities: [], keys: [], snippets: [], portForwardingRules: [] };
 }
 

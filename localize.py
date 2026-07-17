@@ -646,12 +646,13 @@ def patch_csv_groups_to_folders(repo):
         return
     
     current = importers_path.read_text(encoding="utf-8")
-    if "汉化版: 从 __group:xxx__ 特殊 tag 提取分组" not in current:
+    # 用 ensureFolderPath 精确检测多层版本(避免旧单层版本误判为已应用)
+    if "ensureFolderPath" not in current:
         # 直接复制完整文件
         shutil.copy2(importers_src, importers_path)
         log.info("  ✅ CSV Groups 自动映射为文件夹(支持多层目录)")
     else:
-        log.info("  ⏭️ Groups 文件夹映射已启用，跳过")
+        log.info("  ⏭️ Groups 多层文件夹映射已启用，跳过")
 
     # 导出侧: ExportTab 传入 bundle.folders 以重建完整路径
     export_tab = Path(repo) / "src" / "components" / "import-export" / "ExportTab.tsx"
