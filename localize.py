@@ -628,6 +628,33 @@ def patch_csv_format(repo):
     log.info("  ✅ CSV 格式增强(支持 Groups/Label/Password)")
 
 
+def patch_csv_groups_to_folders(repo):
+    """CSV Groups 自动映射为文件夹: importers.ts 智能 bundle 生成。
+
+    从 __group:xxx__ 特殊 tag 提取分组, 生成 FolderExport,
+    连接的 _folder_eid 指向对应文件夹, 导入时自动创建文件夹并关联。
+    """
+    importers_path = Path(repo) / "src" / "services" / "import-export" / "importers.ts"
+    importers_src = Path(__file__).parent / "patches" / "importers.ts"
+    
+    if not importers_src.exists():
+        log.warning("  ⚠️ 未找到 patches/importers.ts，跳过 Groups 文件夹映射")
+        return
+    
+    if not importers_path.exists():
+        log.warning("  ⚠️ 未找到目标 importers.ts，跳过")
+        return
+    
+    current = importers_path.read_text(encoding="utf-8")
+    if "汉化版: 从 __group:xxx__ 特殊 tag 提取分组" in current:
+        log.info("  ⏭️ Groups 文件夹映射已启用，跳过")
+        return
+    
+    # 直接复制完整文件
+    shutil.copy2(importers_src, importers_path)
+    log.info("  ✅ CSV Groups 自动映射为文件夹")
+
+
 def patch_hosts_display(repo):
     """修复主机列表显示: 库根节点显示所有主机(含文件夹内的)。
 
@@ -942,6 +969,7 @@ def do_patch(repo):
     patch_default_theme(repo)      # 再设默认为 flexoki-light
     patch_builtin_themes_font(repo)  # 最后统一改字体（包括新注入的）
     patch_csv_format(repo)         # CSV 格式增强(Groups/Label/Password)
+    patch_csv_groups_to_folders(repo) # CSV Groups 自动映射为文件夹
     patch_hosts_display(repo)      # 修复主机列表显示(库根节点显示所有主机)
     patch_default_settings(repo)   # 默认设置：关闭滚动小地图
     patch_updater(repo)            # 自动更新默认关闭 + 更新源指向自己仓库
