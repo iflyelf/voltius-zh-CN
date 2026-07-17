@@ -669,6 +669,58 @@ def patch_csv_groups_to_folders(repo):
                 log.info("  ✅ 导出 CSV 传入文件夹层级(重建 Groups 路径)")
 
 
+def patch_remaining_ui_text(repo):
+    """批量翻译剩余硬编码英文 UI 文本。
+
+    覆盖导入导出菜单/端口转发提示/同步设置等用户可见文本。
+    """
+    files_patches = {
+        "src/hooks/useImportExportContributions.ts": [
+            ('label: "Export"', 'label: "导出"'),
+            ('label: "Import…"', 'label: "导入…"'),
+            ('label: "Export…"', 'label: "导出…"'),
+            ('label: "Export Vault"', 'label: "导出保管库"'),
+            ('label: "Import into Vault"', 'label: "导入到保管库"'),
+        ],
+        "src/hooks/usePfToastBridge.ts": [
+            ('label: "View Ports →"', 'label: "查看端口 →"'),
+        ],
+        "src/stores/syncPrefsStore.ts": [
+            ('label: "Hosts"', 'label: "主机"'),
+            ('sub: "SSH connections"', 'sub: "SSH 连接"'),
+            ('label: "Identities"', 'label: "身份"'),
+            ('sub: "Usernames and credentials"', 'sub: "用户名和凭据"'),
+            ('label: "SSH Keys"', 'label: "SSH 密钥"'),
+            ('sub: "Key pairs stored in keychain"', 'sub: "密钥链中存储的密钥对"'),
+            ('label: "Folders"', 'label: "文件夹"'),
+            ('sub: "Folder structure for organizing objects"', 'sub: "组织对象的文件夹结构"'),
+            ('label: "Port Forwarding"', 'label: "端口转发"'),
+            ('sub: "Saved tunnel rules"', 'sub: "已保存的隧道规则"'),
+        ],
+    }
+
+    translated_count = 0
+    for file_rel, replacements in files_patches.items():
+        file_path = Path(repo) / file_rel
+        if not file_path.exists():
+            continue
+
+        content = file_path.read_text(encoding="utf-8")
+        original = content
+
+        for old, new in replacements:
+            content = content.replace(old, new)
+
+        if content != original:
+            file_path.write_text(content, encoding="utf-8")
+            translated_count += 1
+
+    if translated_count > 0:
+        log.info(f"  ✅ 批量翻译 {translated_count} 个文件的硬编码英文")
+    else:
+        log.info("  ⏭️ 剩余 UI 文本已翻译，跳过")
+
+
 def patch_omni_commands(repo):
     """搜索框(Omni Search)命令汉化: core.commands.ts 硬编码英文 label。
 
@@ -1026,6 +1078,7 @@ def do_patch(repo):
     patch_csv_format(repo)         # CSV 格式增强(Groups/Label/Password)
     patch_csv_groups_to_folders(repo) # CSV Groups 自动映射为文件夹
     patch_omni_commands(repo)      # 搜索框命令汉化(New Host→新建主机 等)
+    patch_remaining_ui_text(repo)  # 批量翻译剩余硬编码英文(导入导出菜单/同步设置等)
     patch_hosts_display(repo)      # 修复主机列表显示(库根节点显示所有主机)
     patch_default_settings(repo)   # 默认设置：关闭滚动小地图
     patch_updater(repo)            # 自动更新默认关闭 + 更新源指向自己仓库
