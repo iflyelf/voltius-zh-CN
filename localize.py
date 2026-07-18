@@ -915,6 +915,97 @@ def patch_folder_counts(repo):
     log.info("  ✅ 文件夹计数递归修复(父文件夹含所有后代连接)")
 
 
+def patch_folder_navigation_persistence(repo):
+    """文件夹导航路径持久化: 连接主机后保持在当前文件夹(不返回根目录)。
+
+    上游问题: 连接主机后 HostsPage 卸载重挂载, useFolderNavigation 的 useState
+              重置为 [], 导航路径丢失, 用户返回主机页时回到根目录。
+    修复: 1) useFolderNavigation 增加模块级缓存(按 persistKey 存储路径)
+          2) 各页面传入 persistKey ("hosts"/"keychain"/"snippets"/"port-forwarding")
+          3) 组件卸载后路径保留在缓存, 重挂载时恢复
+    """
+    hook_path = Path(repo) / "src" / "hooks" / "useFolderNavigation.ts"
+    if not hook_path.exists():
+        log.warning("  ⚠️ 未找到 useFolderNavigation.ts，跳过导航持久化")
+        return
+
+    src = hook_path.read_text(encoding="utf-8")
+    if "模块级缓存" in src or "folderPathCache" in src:
+        log.info("  ⏭️ 文件夹导航持久化已启用，跳过")
+        return
+
+    # 分步精确替换(避免多行注释里的特殊字符导致正则失败)
+    # 1. import 增加 useEffect + 模块级缓存声明
+    anchor1 = 'import { useMemo, useState } from "react";'
+    if anchor1 not in src:
+        log.warning("  ⚠️ 未找到 import 锚点，跳过导航持久化")
+        return
+    replace1 = (
+        'import { useMemo, useState, useEffect } from "react";\n\n'
+        '// 汉化版: 模块级缓存, 保存各页面的文件夹导航路径。\n'
+        '// 连接主机后 HostsPage 会卸载重挂载, 用此缓存避免导航路径丢失(回到根目录)。\n'
+        'const folderPathCache = new Map<string, { id: string; parent_folder_id?: string | null }[]>();'
+    )
+    src = src.replace(anchor1, replace1, 1)
+
+    # 2. 函数签名 + useState 初始化改为缓存版本
+    anchor2 = (
+        'export function useFolderNavigation<T extends FolderNavigable>(allFolders: T[]) {\n'
+        '  const [folderPath, setFolderPath] = useState<T[]>([]);'
+    )
+    if anchor2 not in src:
+        log.warning("  ⚠️ 未找到函数签名锚点，跳过导航持久化")
+        return
+    replace2 = '''export function useFolderNavigation<T extends FolderNavigable>(allFolders: T[], persistKey?: string) {
+  const [folderPath, setFolderPathRaw] = useState<T[]>(
+    () => (persistKey ? (folderPathCache.get(persistKey) as T[] | undefined) ?? [] : []),
+  );
+
+  const setFolderPath: typeof setFolderPathRaw = (value) => {
+    setFolderPathRaw((prev) => {
+      const next = typeof value === "function" ? (value as (p: T[]) => T[])(prev) : value;
+      if (persistKey) folderPathCache.set(persistKey, next);
+      return next;
+    });
+  };
+
+  useEffect(() => {
+    if (!persistKey || folderPath.length === 0) return;
+    const validIds = new Set(allFolders.map((f) => f.id));
+    if (folderPath.some((f) => !validIds.has(f.id))) {
+      const trimmed: T[] = [];
+      for (const f of folderPath) {
+        if (validIds.has(f.id)) trimmed.push(f);
+        else break;
+      }
+      setFolderPath(trimmed);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allFolders]);'''
+    src = src.replace(anchor2, replace2, 1)
+
+    hook_path.write_text(src, encoding="utf-8")
+
+    # 更新各页面传入 persistKey
+    pages = [
+        ("src/components/hosts/HostsPage.tsx", "hosts"),
+        ("src/components/keychain/KeychainPage.tsx", "keychain"),
+        ("src/components/snippets/SnippetsPage.tsx", "snippets"),
+        ("src/components/port_forwarding/PortForwardingPage.tsx", "port-forwarding"),
+    ]
+    for page_rel, key in pages:
+        page_path = Path(repo) / page_rel
+        if not page_path.exists():
+            continue
+        page_src = page_path.read_text(encoding="utf-8")
+        old_call = f'useFolderNavigation(scopedFolders)'
+        new_call = f'useFolderNavigation(scopedFolders, "{key}")'
+        if old_call in page_src:
+            page_path.write_text(page_src.replace(old_call, new_call), encoding="utf-8")
+
+    log.info("  ✅ 文件夹导航持久化(连接主机后保持当前文件夹)")
+
+
 def patch_default_settings(repo):
     """修改默认设置：关闭滚动小地图。"""
     path = Path(repo) / "src" / "stores" / "toggleSettingsStore.ts"
@@ -1195,6 +1286,7 @@ def do_patch(repo):
     patch_remaining_ui_text(repo)  # 批量翻译剩余硬编码英文(导入导出菜单/同步设置等)
     patch_hosts_display(repo)      # 修复主机列表显示(库根节点显示所有主机)
     patch_folder_counts(repo)      # 修复文件夹计数(递归统计后代连接,多层目录)
+    patch_folder_navigation_persistence(repo) # 文件夹导航持久化(连接后保持当前文件夹)
     patch_default_settings(repo)   # 默认设置：关闭滚动小地图
     patch_updater(repo)            # 自动更新默认关闭 + 更新源指向自己仓库
     patch_ssh_algorithms(repo)     # SSH 算法自动适配(修复 10054 连接重置)
