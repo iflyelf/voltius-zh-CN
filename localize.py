@@ -1007,11 +1007,11 @@ def patch_folder_navigation_persistence(repo):
 
 
 def patch_terminal_scroll_after_fit(repo):
-    """终端 resize/全屏后自动滚动到底部(光标可见)。
+    """终端 resize/全屏后自动滚动到顶部(显示历史开头)。
 
     上游问题: fitAddon.fit() 后终端扩大, 但滚动位置不变, 导致光标/内容停留在下方,
               顶部出现空白(全屏/最大化/窗口resize/字体变化时)。
-    修复: 所有 fit 调用后增加 terminal.scrollToBottom(), 保持光标和最新内容可见。
+    修复: 所有 fit 调用后增加 terminal.scrollToTop(), 滚动到历史开头。
     """
     path = Path(repo) / "src" / "hooks" / "useTerminal.ts"
     if not path.exists():
@@ -1020,7 +1020,7 @@ def patch_terminal_scroll_after_fit(repo):
 
     src = path.read_text(encoding="utf-8")
 
-    if "scrollToBottom(); // 汉化版" in src:
+    if "scrollToTop(); // 汉化版" in src:
         log.info("  ⏭️ 终端 fit 后滚动已启用，跳过")
         return
 
@@ -1030,7 +1030,7 @@ def patch_terminal_scroll_after_fit(repo):
             '  try { entry.fitAddon.fit(); } catch { /* container not laid out yet */ }',
             '  try {\n'
             '    entry.fitAddon.fit();\n'
-            '    entry.terminal.scrollToBottom(); // 汉化版: 全屏/resize后滚动到底部,光标可见\n'
+            '    entry.terminal.scrollToTop(); // 汉化版: 全屏/resize后滚动到顶部,显示历史开头\n'
             '  } catch { /* container not laid out yet */ }'
         ),
         # 2. 第一个 mount 路径: window resize handler
@@ -1038,7 +1038,7 @@ def patch_terminal_scroll_after_fit(repo):
             '        const handleWindowResize = () => fitAddon.fit();',
             '        const handleWindowResize = () => {\n'
             '          fitAddon.fit();\n'
-            '          terminal.scrollToBottom(); // 汉化版: 窗口resize后滚动到底部\n'
+            '          terminal.scrollToTop(); // 汉化版: 窗口resize后滚动到顶部\n'
             '        };'
         ),
         # 3. 第一个 mount 路径: ResizeObserver
@@ -1047,7 +1047,7 @@ def patch_terminal_scroll_after_fit(repo):
             '          fitTimer = setTimeout(() => {\n'
             '            fitTimer = null;\n'
             '            fitAddon.fit();\n'
-            '            terminal.scrollToBottom(); // 汉化版: resize后滚动到底部\n'
+            '            terminal.scrollToTop(); // 汉化版: resize后滚动到顶部\n'
             '          }, 50);'
         ),
         # 4. 第二个 mount 路径: window resize handler (term 变量)
@@ -1056,7 +1056,7 @@ def patch_terminal_scroll_after_fit(repo):
             '      window.addEventListener("resize", handleWindowResize);',
             '      const handleWindowResize = () => {\n'
             '        fitAddon.fit();\n'
-            '        term.scrollToBottom(); // 汉化版: 窗口resize后滚动到底部\n'
+            '        term.scrollToTop(); // 汉化版: 窗口resize后滚动到顶部\n'
             '      };\n'
             '      window.addEventListener("resize", handleWindowResize);'
         ),
@@ -1068,7 +1068,7 @@ def patch_terminal_scroll_after_fit(repo):
             '        fitTimer = setTimeout(() => {\n'
             '          fitTimer = null;\n'
             '          fitAddon.fit();\n'
-            '          term.scrollToBottom(); // 汉化版: resize后滚动到底部\n'
+            '          term.scrollToTop(); // 汉化版: resize后滚动到顶部\n'
             '        }, 50);\n'
             '      });\n'
             '      resizeObserver.observe(container);'
@@ -1078,7 +1078,7 @@ def patch_terminal_scroll_after_fit(repo):
             '    fitAddon.fit();\n'
             '    // Force-send current dimensions',
             '    fitAddon.fit();\n'
-            '    term.scrollToBottom(); // 汉化版: fit后滚动到底部\n'
+            '    term.scrollToTop(); // 汉化版: fit后滚动到顶部\n'
             '    // Force-send current dimensions'
         ),
         # 7. theme change (font size change)
@@ -1092,7 +1092,7 @@ def patch_terminal_scroll_after_fit(repo):
             '      if (term.options.fontSize !== theme.terminalFontSize) {\n'
             '        term.options.fontSize = theme.terminalFontSize;\n'
             '        fitAddon.fit();\n'
-            '        term.scrollToBottom(); // 汉化版: 字体大小变化后滚动到底部\n'
+            '        term.scrollToTop(); // 汉化版: 字体大小变化后滚动到顶部\n'
             '      }\n'
             '    });\n'
             '  }, [sessionId]);'
@@ -1108,7 +1108,7 @@ def patch_terminal_scroll_after_fit(repo):
             '      if (term.options.fontSize !== theme.terminalFontSize) {\n'
             '        term.options.fontSize = theme.terminalFontSize;\n'
             '        fitAddon.fit();\n'
-            '        term.scrollToBottom(); // 汉化版: 字体大小变化后滚动到底部\n'
+            '        term.scrollToTop(); // 汉化版: 字体大小变化后滚动到顶部\n'
             '      }\n'
             '    };\n'
             '    window.addEventListener("theme-preview", handler);'
@@ -1123,7 +1123,7 @@ def patch_terminal_scroll_after_fit(repo):
 
     if count > 0:
         path.write_text(src, encoding="utf-8")
-        log.info(f"  ✅ 终端 fit 后自动滚动({count}/8 处修复)")
+        log.info(f"  ✅ 终端 fit 后滚动到顶部({count}/8 处修复)")
     else:
         log.info("  ⏭️ 未匹配到 fit 调用点，跳过")
 
