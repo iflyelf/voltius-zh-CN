@@ -1028,127 +1028,6 @@ def patch_folder_navigation_persistence(repo):
     log.info("  ✅ 文件夹导航持久化(连接主机后保持当前文件夹)")
 
 
-def patch_terminal_scroll_after_fit(repo):
-    """终端 resize/全屏后自动滚动到顶部(显示历史开头)。
-
-    上游问题: fitAddon.fit() 后终端扩大, 但滚动位置不变, 导致光标/内容停留在下方,
-              顶部出现空白(全屏/最大化/窗口resize/字体变化时)。
-    修复: 所有 fit 调用后增加 terminal.scrollToTop(), 滚动到历史开头。
-    """
-    path = Path(repo) / "src" / "hooks" / "useTerminal.ts"
-    if not path.exists():
-        log.warning("  ⚠️ 未找到 useTerminal.ts，跳过终端滚动修复")
-        return
-
-    src = path.read_text(encoding="utf-8")
-
-    if "scrollToTop(); // 汉化版" in src:
-        log.info("  ⏭️ 终端 fit 后滚动已启用，跳过")
-        return
-
-    replacements = [
-        # 1. refitSession
-        (
-            '  try { entry.fitAddon.fit(); } catch { /* container not laid out yet */ }',
-            '  try {\n'
-            '    entry.fitAddon.fit();\n'
-            '    requestAnimationFrame(() => { try { entry.terminal.scrollToTop(); } catch {} }); // 汉化版: 全屏/resize后滚动到顶部,显示历史开头\n'
-            '  } catch { /* container not laid out yet */ }'
-        ),
-        # 2. 第一个 mount 路径: window resize handler
-        (
-            '        const handleWindowResize = () => fitAddon.fit();',
-            '        const handleWindowResize = () => {\n'
-            '          fitAddon.fit();\n'
-            '          requestAnimationFrame(() => terminal.scrollToTop()); // 汉化版: 窗口resize后滚动到顶部\n'
-            '        };'
-        ),
-        # 3. 第一个 mount 路径: ResizeObserver
-        (
-            '          fitTimer = setTimeout(() => { fitTimer = null; fitAddon.fit(); }, 50);',
-            '          fitTimer = setTimeout(() => {\n'
-            '            fitTimer = null;\n'
-            '            fitAddon.fit();\n'
-            '            requestAnimationFrame(() => terminal.scrollToTop()); // 汉化版: resize后滚动到顶部\n'
-            '          }, 50);'
-        ),
-        # 4. 第二个 mount 路径: window resize handler (term 变量)
-        (
-            '      const handleWindowResize = () => fitAddon.fit();\n'
-            '      window.addEventListener("resize", handleWindowResize);',
-            '      const handleWindowResize = () => {\n'
-            '        fitAddon.fit();\n'
-            '        requestAnimationFrame(() => term.scrollToTop()); // 汉化版: 窗口resize后滚动到顶部\n'
-            '      };\n'
-            '      window.addEventListener("resize", handleWindowResize);'
-        ),
-        # 5. 第二个 mount 路径: ResizeObserver (term 变量)
-        (
-            '        fitTimer = setTimeout(() => { fitTimer = null; fitAddon.fit(); }, 50);\n'
-            '      });\n'
-            '      resizeObserver.observe(container);',
-            '        fitTimer = setTimeout(() => {\n'
-            '          fitTimer = null;\n'
-            '          fitAddon.fit();\n'
-            '          requestAnimationFrame(() => term.scrollToTop()); // 汉化版: resize后滚动到顶部\n'
-            '        }, 50);\n'
-            '      });\n'
-            '      resizeObserver.observe(container);'
-        ),
-        # 6. fit callback (maximize/manual fit)
-        (
-            '    fitAddon.fit();\n'
-            '    // Force-send current dimensions',
-            '    fitAddon.fit();\n'
-            '    requestAnimationFrame(() => term.scrollToTop()); // 汉化版: fit后滚动到顶部\n'
-            '    // Force-send current dimensions'
-        ),
-        # 7. theme change (font size change)
-        (
-            '      if (term.options.fontSize !== theme.terminalFontSize) {\n'
-            '        term.options.fontSize = theme.terminalFontSize;\n'
-            '        fitAddon.fit();\n'
-            '      }\n'
-            '    });\n'
-            '  }, [sessionId]);',
-            '      if (term.options.fontSize !== theme.terminalFontSize) {\n'
-            '        term.options.fontSize = theme.terminalFontSize;\n'
-            '        fitAddon.fit();\n'
-            '        requestAnimationFrame(() => term.scrollToTop()); // 汉化版: 字体大小变化后滚动到顶部\n'
-            '      }\n'
-            '    });\n'
-            '  }, [sessionId]);'
-        ),
-        # 8. theme preview (font size change)
-        (
-            '      if (term.options.fontSize !== theme.terminalFontSize) {\n'
-            '        term.options.fontSize = theme.terminalFontSize;\n'
-            '        fitAddon.fit();\n'
-            '      }\n'
-            '    };\n'
-            '    window.addEventListener("theme-preview", handler);',
-            '      if (term.options.fontSize !== theme.terminalFontSize) {\n'
-            '        term.options.fontSize = theme.terminalFontSize;\n'
-            '        fitAddon.fit();\n'
-            '        requestAnimationFrame(() => term.scrollToTop()); // 汉化版: 字体大小变化后滚动到顶部\n'
-            '      }\n'
-            '    };\n'
-            '    window.addEventListener("theme-preview", handler);'
-        ),
-    ]
-
-    count = 0
-    for old, new in replacements:
-        if old in src:
-            src = src.replace(old, new, 1)
-            count += 1
-
-    if count > 0:
-        path.write_text(src, encoding="utf-8")
-        log.info(f"  ✅ 终端 fit 后滚动到顶部({count}/8 处修复)")
-    else:
-        log.info("  ⏭️ 未匹配到 fit 调用点，跳过")
-
 
 def patch_default_settings(repo):
     """修改默认设置：关闭滚动小地图。"""
@@ -1436,7 +1315,6 @@ def do_patch(repo):
     patch_ssh_algorithms(repo)     # SSH 算法自动适配(修复 10054 连接重置)
     patch_keepalive(repo)          # 放宽 SSH keepalive,修复频繁断线
     patch_terminal_bold(repo)      # 终端粗体优化(亮色+加重+高对比度)
-    patch_terminal_scroll_after_fit(repo) # 终端 resize/全屏后自动滚动到底部
     log.info("✅ 补丁应用完成")
 
 
