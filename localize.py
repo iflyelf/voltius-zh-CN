@@ -853,7 +853,7 @@ def patch_hosts_display(repo):
         log.info("  ⏭️ 主机显示已修复，跳过")
         return
 
-    # 把顶层过滤的"只显示未分类"改为"显示全部"
+    # 1. 把顶层过滤的"只显示未分类"改为"显示全部"
     pattern = re.compile(
         r'if \(activeFolderId\) return c\.folder_id === activeFolderId;\s*'
         r'// Top level:.*?\n\s*'
@@ -869,6 +869,13 @@ def patch_hosts_display(repo):
     if n == 0:
         log.warning("  ⚠️ 未匹配到主机过滤逻辑，跳过")
         return
+
+    # 2. 修复空状态: 有子文件夹时不显示"该文件夹是空的"
+    old_empty = '{activeFolderId && filtered.length === 0 && !showForm && !showSerialForm && ('
+    new_empty = '{activeFolderId && filtered.length === 0 && visibleFolders.length === 0 && !showForm && !showSerialForm && ('
+    if old_empty in new_src:
+        new_src = new_src.replace(old_empty, new_empty, 1)
+        log.info("  ✅ 修复文件夹空状态(有子文件夹时不显示空)")
 
     path.write_text(new_src, encoding="utf-8")
     log.info("  ✅ 主机列表显示修复(库根节点显示所有主机)")
