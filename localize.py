@@ -773,44 +773,66 @@ def patch_remaining_ui_text(repo):
 
 
 def patch_omni_commands(repo):
-    """搜索框(Omni Search)命令汉化: core.commands.ts 硬编码英文 label。
+    """搜索框(Omni Search)命令汉化: 所有 *.commands.ts 硬编码英文。
 
-    将 New Host/New SSH Key/Settings 等核心命令 label 翻译为中文。
+    覆盖 core / importExport / themeCreator / diagnostics 4 个命令文件。
     """
-    path = Path(repo) / "src" / "commands" / "core.commands.ts"
-    if not path.exists():
-        log.warning("  ⚠️ 未找到 core.commands.ts，跳过搜索框命令汉化")
-        return
+    files_patches = {
+        "src/commands/core.commands.ts": [
+            ('label: "New Host"', 'label: "新建主机"'),
+            ('label: "New SSH Key"', 'label: "新建 SSH 密钥"'),
+            ('label: "New Identity"', 'label: "新建身份"'),
+            ('label: "Settings"', 'label: "设置"'),
+            ('label: "Check for Update"', 'label: "检查更新"'),
+            ('label: "What\'s New"', 'label: "更新日志"'),
+            ('label: "Port Forwarding"', 'label: "端口转发"'),
+            ('label: "Known Hosts"', 'label: "已知主机"'),
+            ('label: "Logs"', 'label: "日志"'),
+            ('label: "New Snippet"', 'label: "新建代码片段"'),
+            ('label: "Team Members"', 'label: "团队成员"'),
+            ('label: "Disconnect All"', 'label: "断开所有连接"'),
+        ],
+        "src/components/theme-creator/themeCreator.commands.ts": [
+            ('label: "Create Custom Theme"', 'label: "创建自定义主题"'),
+        ],
+        "src/components/diagnostics/diagnostics.commands.ts": [
+            ('label: "Report a bug"', 'label: "报告问题"'),
+        ],
+        "src/components/import-export/importExport.commands.ts": [
+            # 动态导入命令模板
+            ('label: `Import from ${importer.label}${importer.autoExtract ? "" : "…"}`',
+             'label: `从 ${importer.label} 导入${importer.autoExtract ? "" : "…"}`'),
+            # 导出命令
+            ('label: "Export vault data…"', 'label: "导出保管库数据…"'),
+            ('label: "Export connections…"', 'label: "导出连接…"'),
+            ('label: "Export identities…"', 'label: "导出身份…"'),
+            ('label: "Export SSH keys…"', 'label: "导出 SSH 密钥…"'),
+            ('label: "Export snippets…"', 'label: "导出代码片段…"'),
+            ('label: "Export port forwarding rules…"', 'label: "导出端口转发规则…"'),
+            ('label: "Export custom themes…"', 'label: "导出自定义主题…"'),
+            ('label: "Import themes…"', 'label: "导入主题…"'),
+            # 分区标题
+            ('section: "Import / Export"', 'section: "导入 / 导出"'),
+        ],
+    }
 
-    src = path.read_text(encoding="utf-8")
+    total = 0
+    for file_rel, replacements in files_patches.items():
+        fpath = Path(repo) / file_rel
+        if not fpath.exists():
+            continue
+        src = fpath.read_text(encoding="utf-8")
+        original = src
+        for old, new in replacements:
+            src = src.replace(old, new)
+        if src != original:
+            fpath.write_text(src, encoding="utf-8")
+            total += 1
 
-    if "新建主机" in src or "新建 SSH 密钥" in src:
+    if total > 0:
+        log.info(f"  ✅ 搜索框命令汉化({total} 个命令文件)")
+    else:
         log.info("  ⏭️ 搜索框命令已汉化，跳过")
-        return
-
-    # 批量替换核心命令 label
-    replacements = [
-        ('label: "New Host"', 'label: "新建主机"'),
-        ('label: "New SSH Key"', 'label: "新建 SSH 密钥"'),
-        ('label: "New Identity"', 'label: "新建身份"'),
-        ('label: "Settings"', 'label: "设置"'),
-        ('label: "Check for Update"', 'label: "检查更新"'),
-        ('label: "What\'s New"', 'label: "更新日志"'),
-        ('label: "Port Forwarding"', 'label: "端口转发"'),
-        ('label: "Known Hosts"', 'label: "已知主机"'),
-        ('label: "Logs"', 'label: "日志"'),
-        ('label: "New Snippet"', 'label: "新建代码片段"'),
-        ('label: "Team Members"', 'label: "团队成员"'),
-        ('label: "Disconnect All"', 'label: "断开所有连接"'),
-    ]
-
-    new_src = src
-    for old, new in replacements:
-        new_src = new_src.replace(old, new)
-
-    if new_src != src:
-        path.write_text(new_src, encoding="utf-8")
-        log.info("  ✅ 搜索框命令汉化(New Host→新建主机 等)")
 
 
 def patch_hosts_display(repo):
@@ -1030,7 +1052,7 @@ def patch_terminal_scroll_after_fit(repo):
             '  try { entry.fitAddon.fit(); } catch { /* container not laid out yet */ }',
             '  try {\n'
             '    entry.fitAddon.fit();\n'
-            '    entry.terminal.scrollToTop(); // 汉化版: 全屏/resize后滚动到顶部,显示历史开头\n'
+            '    requestAnimationFrame(() => { try { entry.terminal.scrollToTop(); } catch {} }); // 汉化版: 全屏/resize后滚动到顶部,显示历史开头\n'
             '  } catch { /* container not laid out yet */ }'
         ),
         # 2. 第一个 mount 路径: window resize handler
@@ -1038,7 +1060,7 @@ def patch_terminal_scroll_after_fit(repo):
             '        const handleWindowResize = () => fitAddon.fit();',
             '        const handleWindowResize = () => {\n'
             '          fitAddon.fit();\n'
-            '          terminal.scrollToTop(); // 汉化版: 窗口resize后滚动到顶部\n'
+            '          requestAnimationFrame(() => terminal.scrollToTop()); // 汉化版: 窗口resize后滚动到顶部\n'
             '        };'
         ),
         # 3. 第一个 mount 路径: ResizeObserver
@@ -1047,7 +1069,7 @@ def patch_terminal_scroll_after_fit(repo):
             '          fitTimer = setTimeout(() => {\n'
             '            fitTimer = null;\n'
             '            fitAddon.fit();\n'
-            '            terminal.scrollToTop(); // 汉化版: resize后滚动到顶部\n'
+            '            requestAnimationFrame(() => terminal.scrollToTop()); // 汉化版: resize后滚动到顶部\n'
             '          }, 50);'
         ),
         # 4. 第二个 mount 路径: window resize handler (term 变量)
@@ -1056,7 +1078,7 @@ def patch_terminal_scroll_after_fit(repo):
             '      window.addEventListener("resize", handleWindowResize);',
             '      const handleWindowResize = () => {\n'
             '        fitAddon.fit();\n'
-            '        term.scrollToTop(); // 汉化版: 窗口resize后滚动到顶部\n'
+            '        requestAnimationFrame(() => term.scrollToTop()); // 汉化版: 窗口resize后滚动到顶部\n'
             '      };\n'
             '      window.addEventListener("resize", handleWindowResize);'
         ),
@@ -1068,7 +1090,7 @@ def patch_terminal_scroll_after_fit(repo):
             '        fitTimer = setTimeout(() => {\n'
             '          fitTimer = null;\n'
             '          fitAddon.fit();\n'
-            '          term.scrollToTop(); // 汉化版: resize后滚动到顶部\n'
+            '          requestAnimationFrame(() => term.scrollToTop()); // 汉化版: resize后滚动到顶部\n'
             '        }, 50);\n'
             '      });\n'
             '      resizeObserver.observe(container);'
@@ -1078,7 +1100,7 @@ def patch_terminal_scroll_after_fit(repo):
             '    fitAddon.fit();\n'
             '    // Force-send current dimensions',
             '    fitAddon.fit();\n'
-            '    term.scrollToTop(); // 汉化版: fit后滚动到顶部\n'
+            '    requestAnimationFrame(() => term.scrollToTop()); // 汉化版: fit后滚动到顶部\n'
             '    // Force-send current dimensions'
         ),
         # 7. theme change (font size change)
@@ -1092,7 +1114,7 @@ def patch_terminal_scroll_after_fit(repo):
             '      if (term.options.fontSize !== theme.terminalFontSize) {\n'
             '        term.options.fontSize = theme.terminalFontSize;\n'
             '        fitAddon.fit();\n'
-            '        term.scrollToTop(); // 汉化版: 字体大小变化后滚动到顶部\n'
+            '        requestAnimationFrame(() => term.scrollToTop()); // 汉化版: 字体大小变化后滚动到顶部\n'
             '      }\n'
             '    });\n'
             '  }, [sessionId]);'
@@ -1108,7 +1130,7 @@ def patch_terminal_scroll_after_fit(repo):
             '      if (term.options.fontSize !== theme.terminalFontSize) {\n'
             '        term.options.fontSize = theme.terminalFontSize;\n'
             '        fitAddon.fit();\n'
-            '        term.scrollToTop(); // 汉化版: 字体大小变化后滚动到顶部\n'
+            '        requestAnimationFrame(() => term.scrollToTop()); // 汉化版: 字体大小变化后滚动到顶部\n'
             '      }\n'
             '    };\n'
             '    window.addEventListener("theme-preview", handler);'
